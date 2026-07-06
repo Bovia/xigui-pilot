@@ -1,0 +1,1929 @@
+{
+  "version": 2,
+  "examDate": "2026-10-24",
+  "startDate": "2026-07-07",
+  "videoSubdir": "01：基础课视频（已完结）",
+  "videoSources": [
+    {
+      "subdir": "01：基础课视频（已完结）",
+      "category": "basic",
+      "mode": "filename"
+    },
+    {
+      "subdir": "02：案例、论文专题（26.10录播课）",
+      "category": "special",
+      "mode": "sequential",
+      "startNo": 901
+    }
+  ],
+  "lessons": {
+    "1": {
+      "no": 1,
+      "title": "0系规第二版导学1—考试介绍—考点分析",
+      "filename": "[01]--0系规第二版导学1—考试介绍—考点分析.mp4",
+      "ext": ".mp4",
+      "category": "basic",
+      "videoSubdir": "01：基础课视频（已完结）",
+      "playable": true,
+      "builtinPlayable": true,
+      "missing": false,
+      "durationSec": 3980
+    },
+    "2": {
+      "no": 2,
+      "title": "0系规第二版导学2—备考规划—学习方法",
+      "filename": "[02]--0系规第二版导学2—备考规划—学习方法.mp4",
+      "ext": ".mp4",
+      "category": "basic",
+      "videoSubdir": "01：基础课视频（已完结）",
+      "playable": true,
+      "builtinPlayable": true,
+      "missing": false,
+      "durationSec": 3093
+    },
+    "3": {
+      "no": 3,
+      "title": "1.1信息系统与信息技术发展—信息化与信息系统内涵",
+      "filename": "[03]--1.1信息系统与信息技术发展—信息化与信息系统内涵.mp4",
+      "ext": ".mp4",
+      "category": "basic",
+      "videoSubdir": "01：基础课视频（已完结）",
+      "playable": true,
+      "builtinPlayable": true,
+      "missing": false,
+      "durationSec": 2087
+    },
+    "4": {
+      "no": 4,
+      "title": "1.2信息系统与信息技术发展—信息系统结构VS诺兰模型",
+      "filename": "[04]--1.2信息系统与信息技术发展—信息系统结构VS诺兰模型.mp4",
+      "ext": ".mp4",
+      "category": "basic",
+      "videoSubdir": "01：基础课视频（已完结）",
+      "playable": true,
+      "builtinPlayable": true,
+      "missing": false,
+      "durationSec": 2836
+    },
+    "5": {
+      "no": 5,
+      "title": "1.3信息技术及其发展—计算机软硬件VS计算机网络",
+      "filename": "[05]--1.3信息技术及其发展—计算机软硬件VS计算机网络.mp4",
+      "ext": ".mp4",
+      "category": "basic",
+      "videoSubdir": "01：基础课视频（已完结）",
+      "playable": true,
+      "builtinPlayable": true,
+      "missing": false,
+      "durationSec": 2956
+    },
+    "6": {
+      "no": 6,
+      "title": "1.4信息系统与信息技术发展—数据存储技术",
+      "filename": "[06]--1.4信息系统与信息技术发展—数据存储技术.mp4",
+      "ext": ".mp4",
+      "category": "basic",
+      "videoSubdir": "01：基础课视频（已完结）",
+      "playable": true,
+      "builtinPlayable": true,
+      "missing": false,
+      "durationSec": 2435
+    },
+    "7": {
+      "no": 7,
+      "title": "1.5信息系统与信息技术发展—信息安全",
+      "filename": "[07]--1.5信息系统与信息技术发展—信息安全.mp4",
+      "ext": ".mp4",
+      "category": "basic",
+      "videoSubdir": "01：基础课视频（已完结）",
+      "playable": true,
+      "builtinPlayable": true,
+      "missing": false,
+      "durationSec": 2027
+    },
+    "8": {
+      "no": 8,
+      "title": "1.6信息系统与信息技术发展—新一代信息技术—物联网VS区块链",
+      "filename": "[08]--1.6信息系统与信息技术发展—新一代信息技术—物联网VS区块链.mkv",
+      "ext": ".mkv",
+      "category": "basic",
+      "videoSubdir": "01：基础课视频（已完结）",
+      "playable": true,
+      "builtinPlayable": false,
+      "missing": false,
+      "durationSec": 0
+    },
+    "9": {
+      "no": 9,
+      "title": "1.7信息系统与信息技术发展—新一代信息技术—云计算VS大数据",
+      "filename": "[09]--1.7信息系统与信息技术发展—新一代信息技术—云计算VS大数据.mp4",
+      "ext": ".mp4",
+      "category": "basic",
+      "videoSubdir": "01：基础课视频（已完结）",
+      "playable": true,
+      "builtinPlayable": true,
+      "missing": false,
+      "durationSec": 2260
+    },
+    "10": {
+      "no": 10,
+      "title": "1.8信息系统与信息技术发展—新一代信息技术—人工智能VS数字孪生等",
+      "filename": "[10]--1.8信息系统与信息技术发展—新一代信息技术—人工智能VS数字孪生等.mp4",
+      "ext": ".mp4",
+      "category": "basic",
+      "videoSubdir": "01：基础课视频（已完结）",
+      "playable": true,
+      "builtinPlayable": true,
+      "missing": false,
+      "durationSec": 2055
+    },
+    "11": {
+      "no": 11,
+      "title": "2.1数字中国与数智化发展—数字化转型VS数字中国概述",
+      "filename": "[11]--2.1数字中国与数智化发展—数字化转型VS数字中国概述.mp4",
+      "ext": ".mp4",
+      "category": "basic",
+      "videoSubdir": "01：基础课视频（已完结）",
+      "playable": true,
+      "builtinPlayable": true,
+      "missing": false,
+      "durationSec": 2781
+    },
+    "12": {
+      "no": 12,
+      "title": "2.2数字中国与数智化发展—数字经济",
+      "filename": "[12]--2.2数字中国与数智化发展—数字经济 .mp4",
+      "ext": ".mp4",
+      "category": "basic",
+      "videoSubdir": "01：基础课视频（已完结）",
+      "playable": true,
+      "builtinPlayable": true,
+      "missing": false,
+      "durationSec": 2124
+    },
+    "13": {
+      "no": 13,
+      "title": "2.3数字中国与数智化发展—数字生态VS数智化发展等",
+      "filename": "[13]--2.3数字中国与数智化发展—数字生态VS数智化发展等 .mp4",
+      "ext": ".mp4",
+      "category": "basic",
+      "videoSubdir": "01：基础课视频（已完结）",
+      "playable": true,
+      "builtinPlayable": true,
+      "missing": false,
+      "durationSec": 2338
+    },
+    "14": {
+      "no": 14,
+      "title": "3.1系统科学与哲学方法论—矛盾论VS实践论",
+      "filename": "[14]--3.1系统科学与哲学方法论—矛盾论VS实践论  .mp4",
+      "ext": ".mp4",
+      "category": "basic",
+      "videoSubdir": "01：基础课视频（已完结）",
+      "playable": true,
+      "builtinPlayable": true,
+      "missing": false,
+      "durationSec": 1998
+    },
+    "15": {
+      "no": 15,
+      "title": "3.2系统科学与哲学方法论—系统论VS信息论",
+      "filename": "[15]--3.2系统科学与哲学方法论—系统论VS信息论 .mp4",
+      "ext": ".mp4",
+      "category": "basic",
+      "videoSubdir": "01：基础课视频（已完结）",
+      "playable": true,
+      "builtinPlayable": true,
+      "missing": false,
+      "durationSec": 2570
+    },
+    "16": {
+      "no": 16,
+      "title": "3.3系统科学与哲学方法论—控制论VS耗散论",
+      "filename": "[16]--3.3系统科学与哲学方法论—控制论VS耗散论 .mp4",
+      "ext": ".mp4",
+      "category": "basic",
+      "videoSubdir": "01：基础课视频（已完结）",
+      "playable": true,
+      "builtinPlayable": true,
+      "missing": false,
+      "durationSec": 2573
+    },
+    "17": {
+      "no": 17,
+      "title": "3.4系统科学与哲学方法论—协同论VS复杂系统论",
+      "filename": "[17]--3.4系统科学与哲学方法论—协同论VS复杂系统论 .mp4",
+      "ext": ".mp4",
+      "category": "basic",
+      "videoSubdir": "01：基础课视频（已完结）",
+      "playable": true,
+      "builtinPlayable": true,
+      "missing": false,
+      "durationSec": 2577
+    },
+    "18": {
+      "no": 18,
+      "title": "4.1信息系统规划—概述",
+      "filename": "[18]--4.1信息系统规划—概述 .mp4",
+      "ext": ".mp4",
+      "category": "basic",
+      "videoSubdir": "01：基础课视频（已完结）",
+      "playable": true,
+      "builtinPlayable": true,
+      "missing": false,
+      "durationSec": 1677
+    },
+    "19": {
+      "no": 19,
+      "title": "4.2信息系统规划主要内容",
+      "filename": "[19]--4.2信息系统规划主要内容 .mp4",
+      "ext": ".mp4",
+      "category": "basic",
+      "videoSubdir": "01：基础课视频（已完结）",
+      "playable": true,
+      "builtinPlayable": true,
+      "missing": false,
+      "durationSec": 3006
+    },
+    "20": {
+      "no": 20,
+      "title": "4.3信息系统规划工作要点",
+      "filename": "[20]--4.3信息系统规划工作要点 .mp4",
+      "ext": ".mp4",
+      "category": "basic",
+      "videoSubdir": "01：基础课视频（已完结）",
+      "playable": true,
+      "builtinPlayable": true,
+      "missing": false,
+      "durationSec": 2761
+    },
+    "21": {
+      "no": 21,
+      "title": "4.4信息系统规划常用方法",
+      "filename": "[21]--4.4信息系统规划常用方法 .mp4",
+      "ext": ".mp4",
+      "category": "basic",
+      "videoSubdir": "01：基础课视频（已完结）",
+      "playable": true,
+      "builtinPlayable": true,
+      "missing": false,
+      "durationSec": 1570
+    },
+    "22": {
+      "no": 22,
+      "title": "5.1应用系统规划—概述",
+      "filename": "[22]--5.1应用系统规划—概述 .mp4",
+      "ext": ".mp4",
+      "category": "basic",
+      "videoSubdir": "01：基础课视频（已完结）",
+      "playable": true,
+      "builtinPlayable": true,
+      "missing": false,
+      "durationSec": 2482
+    },
+    "23": {
+      "no": 23,
+      "title": "5.2应用系统规划—主要内容1",
+      "filename": "[23]--5.2应用系统规划—主要内容1 .mp4",
+      "ext": ".mp4",
+      "category": "basic",
+      "videoSubdir": "01：基础课视频（已完结）",
+      "playable": true,
+      "builtinPlayable": true,
+      "missing": false,
+      "durationSec": 2663
+    },
+    "24": {
+      "no": 24,
+      "title": "5.3应用系统规划—主要内容2",
+      "filename": "[24]--5.3应用系统规划—主要内容2 .mp4",
+      "ext": ".mp4",
+      "category": "basic",
+      "videoSubdir": "01：基础课视频（已完结）",
+      "playable": true,
+      "builtinPlayable": true,
+      "missing": false,
+      "durationSec": 1952
+    },
+    "25": {
+      "no": 25,
+      "title": "5.4 应用系统规划-主要过程",
+      "filename": "[25]--5.4 应用系统规划-主要过程.mp4",
+      "ext": ".mp4",
+      "category": "basic",
+      "videoSubdir": "01：基础课视频（已完结）",
+      "playable": true,
+      "builtinPlayable": true,
+      "missing": false,
+      "durationSec": 2702
+    },
+    "26": {
+      "no": 26,
+      "title": "5.5应用系统规划-主要方法和软件工厂",
+      "filename": "[26]--5.5应用系统规划-主要方法和软件工厂.mp4",
+      "ext": ".mp4",
+      "category": "basic",
+      "videoSubdir": "01：基础课视频（已完结）",
+      "playable": true,
+      "builtinPlayable": true,
+      "missing": false,
+      "durationSec": 2388
+    },
+    "27": {
+      "no": 27,
+      "title": "6.1 云资源规划-概述VS体系架构",
+      "filename": "[27]--6.1 云资源规划-概述VS体系架构.mp4",
+      "ext": ".mp4",
+      "category": "basic",
+      "videoSubdir": "01：基础课视频（已完结）",
+      "playable": true,
+      "builtinPlayable": true,
+      "missing": false,
+      "durationSec": 3257
+    },
+    "28": {
+      "no": 28,
+      "title": "6.2 云资源规划-计算资源规划VS存储资源规划",
+      "filename": "[28]--6.2 云资源规划-计算资源规划VS存储资源规划.mp4",
+      "ext": ".mp4",
+      "category": "basic",
+      "videoSubdir": "01：基础课视频（已完结）",
+      "playable": true,
+      "builtinPlayable": true,
+      "missing": false,
+      "durationSec": 3381
+    },
+    "29": {
+      "no": 29,
+      "title": "6.3 云资源规划-云数据中心规划",
+      "filename": "[29]--6.3 云资源规划-云数据中心规划.mp4",
+      "ext": ".mp4",
+      "category": "basic",
+      "videoSubdir": "01：基础课视频（已完结）",
+      "playable": true,
+      "builtinPlayable": true,
+      "missing": false,
+      "durationSec": 3072
+    },
+    "30": {
+      "no": 30,
+      "title": "7.1 网络环境规划-网络架构主要技术1",
+      "filename": "[30]--7.1 网络环境规划-网络架构主要技术1.mp4",
+      "ext": ".mp4",
+      "category": "basic",
+      "videoSubdir": "01：基础课视频（已完结）",
+      "playable": true,
+      "builtinPlayable": true,
+      "missing": false,
+      "durationSec": 2484
+    },
+    "31": {
+      "no": 31,
+      "title": "7.2 网络资源规划-网络架构主要技术2",
+      "filename": "[31]--7.2 网络资源规划-网络架构主要技术2.mp4",
+      "ext": ".mp4",
+      "category": "basic",
+      "videoSubdir": "01：基础课视频（已完结）",
+      "playable": true,
+      "builtinPlayable": true,
+      "missing": false,
+      "durationSec": 2709
+    },
+    "32": {
+      "no": 32,
+      "title": "7.3 网络资源规划-广域网规划",
+      "filename": "[32]--7.3 网络资源规划-广域网规划.mp4",
+      "ext": ".mp4",
+      "category": "basic",
+      "videoSubdir": "01：基础课视频（已完结）",
+      "playable": true,
+      "builtinPlayable": true,
+      "missing": false,
+      "durationSec": 1142
+    },
+    "33": {
+      "no": 33,
+      "title": "7.4 网络资源规划-局域网和无线网规划",
+      "filename": "[33]--7.4 网络资源规划-局域网和无线网规划.mp4.baiduyun.p.downloading",
+      "ext": ".downloading",
+      "category": "basic",
+      "videoSubdir": "01：基础课视频（已完结）",
+      "playable": false,
+      "builtinPlayable": false,
+      "missing": true,
+      "durationSec": 0
+    },
+    "34": {
+      "no": 34,
+      "title": "7.5 网络资源规划-网络整体规划的重点事项",
+      "filename": "[34]--7.5 网络资源规划-网络整体规划的重点事项.mp4",
+      "ext": ".mp4",
+      "category": "basic",
+      "videoSubdir": "01：基础课视频（已完结）",
+      "playable": true,
+      "builtinPlayable": true,
+      "missing": false,
+      "durationSec": 1926
+    },
+    "35": {
+      "no": 35,
+      "title": "8.1 数据资源规划-概述vs数据资源规划方法",
+      "filename": "[35]--8.1 数据资源规划-概述vs数据资源规划方法.mp4.baiduyun.p.downloading",
+      "ext": ".downloading",
+      "category": "basic",
+      "videoSubdir": "01：基础课视频（已完结）",
+      "playable": false,
+      "builtinPlayable": false,
+      "missing": true,
+      "durationSec": 0
+    },
+    "36": {
+      "no": 36,
+      "title": "8.2 数据资源规划-数据架构",
+      "filename": "[36]--8.2 数据资源规划-数据架构.mp4",
+      "ext": ".mp4",
+      "category": "basic",
+      "videoSubdir": "01：基础课视频（已完结）",
+      "playable": true,
+      "builtinPlayable": true,
+      "missing": false,
+      "durationSec": 3684
+    },
+    "37": {
+      "no": 37,
+      "title": "8.3 数据资源规划-数据标准化",
+      "filename": "[37]--8.3 数据资源规划-数据标准化.mp4",
+      "ext": ".mp4",
+      "category": "basic",
+      "videoSubdir": "01：基础课视频（已完结）",
+      "playable": true,
+      "builtinPlayable": true,
+      "missing": false,
+      "durationSec": 4353
+    },
+    "38": {
+      "no": 38,
+      "title": "9.1 信息安全规划-概述",
+      "filename": "[38]--9.1 信息安全规划-概述.mp4",
+      "ext": ".mp4",
+      "category": "basic",
+      "videoSubdir": "01：基础课视频（已完结）",
+      "playable": true,
+      "builtinPlayable": true,
+      "missing": false,
+      "durationSec": 2679
+    },
+    "39": {
+      "no": 39,
+      "title": "9.2 信息安全规划-安全架构和信息安全规划内容",
+      "filename": "[39]--9.2 信息安全规划-安全架构和信息安全规划内容.mp4",
+      "ext": ".mp4",
+      "category": "basic",
+      "videoSubdir": "01：基础课视频（已完结）",
+      "playable": true,
+      "builtinPlayable": true,
+      "missing": false,
+      "durationSec": 3707
+    },
+    "40": {
+      "no": 40,
+      "title": "10.1 云原生系统规划-云原生发展背景",
+      "filename": "[40]--10.1 云原生系统规划-云原生发展背景.mp4",
+      "ext": ".mp4",
+      "category": "basic",
+      "videoSubdir": "01：基础课视频（已完结）",
+      "playable": true,
+      "builtinPlayable": true,
+      "missing": false,
+      "durationSec": 2576
+    },
+    "41": {
+      "no": 41,
+      "title": "10.2 云原生系统规划-云原生技术架构",
+      "filename": "[41]--10.2 云原生系统规划-云原生技术架构.mp4",
+      "ext": ".mp4",
+      "category": "basic",
+      "videoSubdir": "01：基础课视频（已完结）",
+      "playable": true,
+      "builtinPlayable": true,
+      "missing": false,
+      "durationSec": 1874
+    },
+    "42": {
+      "no": 42,
+      "title": "10.3 元原生系统规划-云原生建设规划",
+      "filename": "[42]--10.3 元原生系统规划-云原生建设规划.mp4",
+      "ext": ".mp4",
+      "category": "basic",
+      "videoSubdir": "01：基础课视频（已完结）",
+      "playable": true,
+      "builtinPlayable": true,
+      "missing": false,
+      "durationSec": 1411
+    },
+    "43": {
+      "no": 43,
+      "title": "11.1 信息系统治理-IT治理",
+      "filename": "[43]--11.1 信息系统治理-IT治理 .mp4",
+      "ext": ".mp4",
+      "category": "basic",
+      "videoSubdir": "01：基础课视频（已完结）",
+      "playable": true,
+      "builtinPlayable": true,
+      "missing": false,
+      "durationSec": 2843
+    },
+    "44": {
+      "no": 44,
+      "title": "11.2 信息系统治理-IT审计1",
+      "filename": "[44]--11.2 信息系统治理-IT审计1.mp4",
+      "ext": ".mp4",
+      "category": "basic",
+      "videoSubdir": "01：基础课视频（已完结）",
+      "playable": true,
+      "builtinPlayable": true,
+      "missing": false,
+      "durationSec": 4029
+    },
+    "45": {
+      "no": 45,
+      "title": "11.3 信息系统治理-IT审计2",
+      "filename": "[45]--11.3 信息系统治理-IT审计2 .mp4",
+      "ext": ".mp4",
+      "category": "basic",
+      "videoSubdir": "01：基础课视频（已完结）",
+      "playable": true,
+      "builtinPlayable": true,
+      "missing": false,
+      "durationSec": 1914
+    },
+    "46": {
+      "no": 46,
+      "title": "12.1 信息系统服务管理-服务战略规划",
+      "filename": "[46]--12.1 信息系统服务管理-服务战略规划.mp4",
+      "ext": ".mp4",
+      "category": "basic",
+      "videoSubdir": "01：基础课视频（已完结）",
+      "playable": true,
+      "builtinPlayable": true,
+      "missing": false,
+      "durationSec": 2685
+    },
+    "47": {
+      "no": 47,
+      "title": "12.2 信息系统服务管理-服务设计实现01",
+      "filename": "[47]--12.2 信息系统服务管理-服务设计实现01.mp4",
+      "ext": ".mp4",
+      "category": "basic",
+      "videoSubdir": "01：基础课视频（已完结）",
+      "playable": true,
+      "builtinPlayable": true,
+      "missing": false,
+      "durationSec": 2180
+    },
+    "48": {
+      "no": 48,
+      "title": "12.3 信息系统服务管理-服务设计实现02",
+      "filename": "[48]--12.3 信息系统服务管理-服务设计实现02.mp4",
+      "ext": ".mp4",
+      "category": "basic",
+      "videoSubdir": "01：基础课视频（已完结）",
+      "playable": true,
+      "builtinPlayable": true,
+      "missing": false,
+      "durationSec": 2721
+    },
+    "49": {
+      "no": 49,
+      "title": "12.4 信息系统服务管理-服务运营提升",
+      "filename": "[49]--12.4 信息系统服务管理-服务运营提升 .mp4",
+      "ext": ".mp4",
+      "category": "basic",
+      "videoSubdir": "01：基础课视频（已完结）",
+      "playable": true,
+      "builtinPlayable": true,
+      "missing": false,
+      "durationSec": 4000
+    },
+    "50": {
+      "no": 50,
+      "title": "12.5 信息系统服务管理-服务退役终止",
+      "filename": "[50]--12.5 信息系统服务管理-服务退役终止.mp4",
+      "ext": ".mp4",
+      "category": "basic",
+      "videoSubdir": "01：基础课视频（已完结）",
+      "playable": true,
+      "builtinPlayable": true,
+      "missing": false,
+      "durationSec": 2884
+    },
+    "51": {
+      "no": 51,
+      "title": "12.6 信息系统服务管理-持续改进与监督",
+      "filename": "[51]--12.6 信息系统服务管理-持续改进与监督.mp4",
+      "ext": ".mp4",
+      "category": "basic",
+      "videoSubdir": "01：基础课视频（已完结）",
+      "playable": true,
+      "builtinPlayable": true,
+      "missing": false,
+      "durationSec": 1183
+    },
+    "52": {
+      "no": 52,
+      "title": "13.1 人员管理-工作分析",
+      "filename": "[52]--13.1 人员管理-工作分析.mp4",
+      "ext": ".mp4",
+      "category": "basic",
+      "videoSubdir": "01：基础课视频（已完结）",
+      "playable": true,
+      "builtinPlayable": true,
+      "missing": false,
+      "durationSec": 3065
+    },
+    "53": {
+      "no": 53,
+      "title": "13.2 人员管理-岗位设计",
+      "filename": "[53]--13.2 人员管理-岗位设计.mp4",
+      "ext": ".mp4",
+      "category": "basic",
+      "videoSubdir": "01：基础课视频（已完结）",
+      "playable": true,
+      "builtinPlayable": true,
+      "missing": false,
+      "durationSec": 1424
+    },
+    "54": {
+      "no": 54,
+      "title": "13.3 人员管理-人力资源战略与计划",
+      "filename": "[54]--13.3 人员管理-人力资源战略与计划.mp4",
+      "ext": ".mp4",
+      "category": "basic",
+      "videoSubdir": "01：基础课视频（已完结）",
+      "playable": true,
+      "builtinPlayable": true,
+      "missing": false,
+      "durationSec": 2991
+    },
+    "55": {
+      "no": 55,
+      "title": "13.4 人员管理-人员招聘与录用",
+      "filename": "[55]--13.4 人员管理-人员招聘与录用.mp4",
+      "ext": ".mp4",
+      "category": "basic",
+      "videoSubdir": "01：基础课视频（已完结）",
+      "playable": true,
+      "builtinPlayable": true,
+      "missing": false,
+      "durationSec": 2321
+    },
+    "56": {
+      "no": 56,
+      "title": "13.5 人员管理-人员培训与绩效管理",
+      "filename": "[56]--13.5 人员管理-人员培训与绩效管理.mp4",
+      "ext": ".mp4",
+      "category": "basic",
+      "videoSubdir": "01：基础课视频（已完结）",
+      "playable": true,
+      "builtinPlayable": true,
+      "missing": false,
+      "durationSec": 2733
+    },
+    "57": {
+      "no": 57,
+      "title": "13.6 人员管理-薪酬管理VS职业规划",
+      "filename": "[57]--13.6 人员管理-薪酬管理VS职业规划.mp4",
+      "ext": ".mp4",
+      "category": "basic",
+      "videoSubdir": "01：基础课视频（已完结）",
+      "playable": true,
+      "builtinPlayable": true,
+      "missing": false,
+      "durationSec": 2420
+    },
+    "58": {
+      "no": 58,
+      "title": "14.1 规范与过程管理-管理标准化",
+      "filename": "[58]--14.1 规范与过程管理-管理标准化.mp4",
+      "ext": ".mp4",
+      "category": "basic",
+      "videoSubdir": "01：基础课视频（已完结）",
+      "playable": true,
+      "builtinPlayable": true,
+      "missing": false,
+      "durationSec": 2097
+    },
+    "59": {
+      "no": 59,
+      "title": "14.2 规范与过程管理-流程规划和执行",
+      "filename": "[59]--14.2 规范与过程管理-流程规划和执行.mp4",
+      "ext": ".mp4",
+      "category": "basic",
+      "videoSubdir": "01：基础课视频（已完结）",
+      "playable": true,
+      "builtinPlayable": true,
+      "missing": false,
+      "durationSec": 1668
+    },
+    "60": {
+      "no": 60,
+      "title": "14.3 规范与过程管理-流程评价与持续改进",
+      "filename": "[60]--14.3 规范与过程管理-流程评价与持续改进.mp4",
+      "ext": ".mp4",
+      "category": "basic",
+      "videoSubdir": "01：基础课视频（已完结）",
+      "playable": true,
+      "builtinPlayable": true,
+      "missing": false,
+      "durationSec": 1063
+    },
+    "61": {
+      "no": 61,
+      "title": "15.1 技术与研发管理-技术研发管理",
+      "filename": "[61]--15.1 技术与研发管理-技术研发管理.mp4",
+      "ext": ".mp4",
+      "category": "basic",
+      "videoSubdir": "01：基础课视频（已完结）",
+      "playable": true,
+      "builtinPlayable": true,
+      "missing": false,
+      "durationSec": 2644
+    },
+    "62": {
+      "no": 62,
+      "title": "15.2 技术与研发管理-技术研发应用",
+      "filename": "[62]--15.2 技术与研发管理-技术研发应用.mp4",
+      "ext": ".mp4",
+      "category": "basic",
+      "videoSubdir": "01：基础课视频（已完结）",
+      "playable": true,
+      "builtinPlayable": true,
+      "missing": false,
+      "durationSec": 1541
+    },
+    "63": {
+      "no": 63,
+      "title": "15.3 技术与研发管理-知识产权管理",
+      "filename": "[63]--15.3 技术与研发管理-知识产权管理.mp4",
+      "ext": ".mp4",
+      "category": "basic",
+      "videoSubdir": "01：基础课视频（已完结）",
+      "playable": true,
+      "builtinPlayable": true,
+      "missing": false,
+      "durationSec": 1248
+    },
+    "64": {
+      "no": 64,
+      "title": "16.1 资源与工具管理-研发与测试管理",
+      "filename": "[64]--16.1 资源与工具管理-研发与测试管理.mp4",
+      "ext": ".mp4",
+      "category": "basic",
+      "videoSubdir": "01：基础课视频（已完结）",
+      "playable": true,
+      "builtinPlayable": true,
+      "missing": false,
+      "durationSec": 4449
+    },
+    "65": {
+      "no": 65,
+      "title": "16.2 资源与工具管理-运维工具",
+      "filename": "[65]--16.2 资源与工具管理-运维工具.mp4.baiduyun.p.downloading",
+      "ext": ".downloading",
+      "category": "basic",
+      "videoSubdir": "01：基础课视频（已完结）",
+      "playable": false,
+      "builtinPlayable": false,
+      "missing": true,
+      "durationSec": 0
+    },
+    "66": {
+      "no": 66,
+      "title": "16.3 资源与工具管理-项目管理工具",
+      "filename": "[66]--16.3 资源与工具管理-项目管理工具.mp4.baiduyun.p.downloading",
+      "ext": ".downloading",
+      "category": "basic",
+      "videoSubdir": "01：基础课视频（已完结）",
+      "playable": false,
+      "builtinPlayable": false,
+      "missing": true,
+      "durationSec": 0
+    },
+    "67": {
+      "no": 67,
+      "title": "17.1 信息系统项目管理-项目基本要素",
+      "filename": "[67]--17.1 信息系统项目管理-项目基本要素.mp4.baiduyun.p.downloading",
+      "ext": ".downloading",
+      "category": "basic",
+      "videoSubdir": "01：基础课视频（已完结）",
+      "playable": false,
+      "builtinPlayable": false,
+      "missing": true,
+      "durationSec": 0
+    },
+    "69": {
+      "no": 69,
+      "title": "17.3 信息系统项目管理-价值驱动的项目管理知识体系",
+      "filename": "[69]--17.3 信息系统项目管理-价值驱动的项目管理知识体系.mp4",
+      "ext": ".mp4",
+      "category": "basic",
+      "videoSubdir": "01：基础课视频（已完结）",
+      "playable": true,
+      "builtinPlayable": true,
+      "missing": false,
+      "durationSec": 2819
+    },
+    "70": {
+      "no": 70,
+      "title": "18.1 智慧城市发展规划-发展整体环境和发展关注焦点",
+      "filename": "[70]--18.1 智慧城市发展规划-发展整体环境和发展关注焦点.mp4",
+      "ext": ".mp4",
+      "category": "basic",
+      "videoSubdir": "01：基础课视频（已完结）",
+      "playable": true,
+      "builtinPlayable": true,
+      "missing": false,
+      "durationSec": 4130
+    },
+    "71": {
+      "no": 71,
+      "title": "18.2 智慧城市规划-规划要点和系统架构",
+      "filename": "[71]--18.2 智慧城市规划-规划要点和系统架构.mp4",
+      "ext": ".mp4",
+      "category": "basic",
+      "videoSubdir": "01：基础课视频（已完结）",
+      "playable": true,
+      "builtinPlayable": true,
+      "missing": false,
+      "durationSec": 3328
+    },
+    "72": {
+      "no": 72,
+      "title": "19.1 智慧园区发展规划-发展宏观环境和发展关键点",
+      "filename": "[72]--19.1 智慧园区发展规划-发展宏观环境和发展关键点.mp4",
+      "ext": ".mp4",
+      "category": "basic",
+      "videoSubdir": "01：基础课视频（已完结）",
+      "playable": true,
+      "builtinPlayable": true,
+      "missing": false,
+      "durationSec": 3299
+    },
+    "73": {
+      "no": 73,
+      "title": "19.2 智慧园区发展规划-发展规划要点和案例",
+      "filename": "[73]--19.2 智慧园区发展规划-发展规划要点和案例.mp4",
+      "ext": ".mp4",
+      "category": "basic",
+      "videoSubdir": "01：基础课视频（已完结）",
+      "playable": true,
+      "builtinPlayable": true,
+      "missing": false,
+      "durationSec": 2221
+    },
+    "74": {
+      "no": 74,
+      "title": "20.1 数字乡村发展规划-发展环境VS发展关键焦点",
+      "filename": "[74]--20.1 数字乡村发展规划-发展环境VS发展关键焦点.mp4",
+      "ext": ".mp4",
+      "category": "basic",
+      "videoSubdir": "01：基础课视频（已完结）",
+      "playable": true,
+      "builtinPlayable": true,
+      "missing": false,
+      "durationSec": 3077
+    },
+    "75": {
+      "no": 75,
+      "title": "20.2 数字乡村发展规划-发展规划要点VS主要架构",
+      "filename": "[75]--20.2 数字乡村发展规划-发展规划要点VS主要架构.mp4",
+      "ext": ".mp4",
+      "category": "basic",
+      "videoSubdir": "01：基础课视频（已完结）",
+      "playable": true,
+      "builtinPlayable": true,
+      "missing": false,
+      "durationSec": 3117
+    },
+    "76": {
+      "no": 76,
+      "title": "21.1 企业数字化转型发展规划-转型驱动力VS转型关注焦点",
+      "filename": "[76]--21.1 企业数字化转型发展规划-转型驱动力VS转型关注焦点.mp4",
+      "ext": ".mp4",
+      "category": "basic",
+      "videoSubdir": "01：基础课视频（已完结）",
+      "playable": true,
+      "builtinPlayable": true,
+      "missing": false,
+      "durationSec": 3142
+    },
+    "77": {
+      "no": 77,
+      "title": "21.2 企业数字化转型-转型能力成熟度",
+      "filename": "[77]--21.2 企业数字化转型-转型能力成熟度.mp4",
+      "ext": ".mp4",
+      "category": "basic",
+      "videoSubdir": "01：基础课视频（已完结）",
+      "playable": true,
+      "builtinPlayable": true,
+      "missing": false,
+      "durationSec": 3498
+    },
+    "78": {
+      "no": 78,
+      "title": "21.3 企业数字化转型发展规划-转型规划要点及架构",
+      "filename": "[78]--21.3 企业数字化转型发展规划-转型规划要点及架构.mp4",
+      "ext": ".mp4",
+      "category": "basic",
+      "videoSubdir": "01：基础课视频（已完结）",
+      "playable": true,
+      "builtinPlayable": true,
+      "missing": false,
+      "durationSec": 2136
+    },
+    "79": {
+      "no": 79,
+      "title": "22.1 智能制造发展规划-发展整体环境VS发展关注焦点",
+      "filename": "[79]--22.1 智能制造发展规划-发展整体环境VS发展关注焦点.mp4",
+      "ext": ".mp4",
+      "category": "basic",
+      "videoSubdir": "01：基础课视频（已完结）",
+      "playable": true,
+      "builtinPlayable": true,
+      "missing": false,
+      "durationSec": 3569
+    },
+    "80": {
+      "no": 80,
+      "title": "22.2 智能制造发展规划-成熟度模型vs系统架构",
+      "filename": "[80]--22.2 智能制造发展规划-成熟度模型vs系统架构.mp4",
+      "ext": ".mp4",
+      "category": "basic",
+      "videoSubdir": "01：基础课视频（已完结）",
+      "playable": true,
+      "builtinPlayable": true,
+      "missing": false,
+      "durationSec": 2459
+    },
+    "81": {
+      "no": 81,
+      "title": "23.1 新型消费系统规划-宏观环境VS关注焦点",
+      "filename": "[81]--23.1 新型消费系统规划-宏观环境VS关注焦点.mp4",
+      "ext": ".mp4",
+      "category": "basic",
+      "videoSubdir": "01：基础课视频（已完结）",
+      "playable": true,
+      "builtinPlayable": true,
+      "missing": false,
+      "durationSec": 2764
+    },
+    "82": {
+      "no": 82,
+      "title": "23.2 新型消费系统规划-规划要点VS系统架构",
+      "filename": "[82]--23.2 新型消费系统规划-规划要点VS系统架构.mp4",
+      "ext": ".mp4",
+      "category": "basic",
+      "videoSubdir": "01：基础课视频（已完结）",
+      "playable": true,
+      "builtinPlayable": true,
+      "missing": false,
+      "durationSec": 2304
+    },
+    "83": {
+      "no": 83,
+      "title": "24.法律法规和标准规范",
+      "filename": "[83]--24.法律法规和标准规范.mp4",
+      "ext": ".mp4",
+      "category": "basic",
+      "videoSubdir": "01：基础课视频（已完结）",
+      "playable": true,
+      "builtinPlayable": true,
+      "missing": false,
+      "durationSec": 3989
+    },
+    "901": {
+      "no": 901,
+      "title": "25.1 案例分析专题一",
+      "filename": "[82]--25.1 案例分析专题一.mp4",
+      "ext": ".mp4",
+      "category": "special",
+      "videoSubdir": "02：案例、论文专题（26.10录播课）",
+      "playable": true,
+      "builtinPlayable": true,
+      "missing": false,
+      "durationSec": 4089
+    },
+    "902": {
+      "no": 902,
+      "title": "25.2 案例分析专题二",
+      "filename": "[83]--25.2 案例分析专题二.mp4",
+      "ext": ".mp4",
+      "category": "special",
+      "videoSubdir": "02：案例、论文专题（26.10录播课）",
+      "playable": true,
+      "builtinPlayable": true,
+      "missing": false,
+      "durationSec": 3382
+    },
+    "903": {
+      "no": 903,
+      "title": "26.1 论文写作专题-论文写作概述",
+      "filename": "[84]--26.1 论文写作专题-论文写作概述.mp4",
+      "ext": ".mp4",
+      "category": "special",
+      "videoSubdir": "02：案例、论文专题（26.10录播课）",
+      "playable": true,
+      "builtinPlayable": true,
+      "missing": false,
+      "durationSec": 3660
+    },
+    "904": {
+      "no": 904,
+      "title": "26.2 论文专题-论文写作框架",
+      "filename": "[85]--26.2 论文专题-论文写作框架.mp4",
+      "ext": ".mp4",
+      "category": "special",
+      "videoSubdir": "02：案例、论文专题（26.10录播课）",
+      "playable": true,
+      "builtinPlayable": true,
+      "missing": false,
+      "durationSec": 4317
+    },
+    "905": {
+      "no": 905,
+      "title": "26.3 论文专题-模拟题及点评",
+      "filename": "[86]--26.3 论文专题-模拟题及点评.mp4",
+      "ext": ".mp4",
+      "category": "special",
+      "videoSubdir": "02：案例、论文专题（26.10录播课）",
+      "playable": true,
+      "builtinPlayable": true,
+      "missing": false,
+      "durationSec": 1800
+    }
+  },
+  "weeks": [
+    {
+      "id": "W1",
+      "stage": "导学",
+      "phase": "输入期",
+      "focus": "考试认知+教材导读+备考规划",
+      "start": "2026-07-07",
+      "end": "2026-07-13",
+      "tasks": [
+        {
+          "id": "w1-01",
+          "type": "video",
+          "lessonNo": 1,
+          "title": "0系规第二版导学1—考试介绍—考点分析",
+          "scheduledDate": "2026-07-07",
+          "missing": false
+        },
+        {
+          "id": "w1-02",
+          "type": "video",
+          "lessonNo": 2,
+          "title": "0系规第二版导学2—备考规划—学习方法",
+          "scheduledDate": "2026-07-08",
+          "missing": false
+        }
+      ]
+    },
+    {
+      "id": "W2",
+      "stage": "基础",
+      "phase": "输入期",
+      "focus": "第1章 信息系统与信息技术发展",
+      "start": "2026-07-14",
+      "end": "2026-07-20",
+      "tasks": [
+        {
+          "id": "w2-03",
+          "type": "video",
+          "lessonNo": 3,
+          "title": "1.1信息系统与信息技术发展—信息化与信息系统内涵",
+          "scheduledDate": "2026-07-14",
+          "missing": false
+        },
+        {
+          "id": "w2-10",
+          "type": "video",
+          "lessonNo": 10,
+          "title": "1.8信息系统与信息技术发展—新一代信息技术—人工智能VS数字孪生等",
+          "scheduledDate": "2026-07-14",
+          "missing": false
+        },
+        {
+          "id": "w2-04",
+          "type": "video",
+          "lessonNo": 4,
+          "title": "1.2信息系统与信息技术发展—信息系统结构VS诺兰模型",
+          "scheduledDate": "2026-07-15",
+          "missing": false
+        },
+        {
+          "id": "w2-05",
+          "type": "video",
+          "lessonNo": 5,
+          "title": "1.3信息技术及其发展—计算机软硬件VS计算机网络",
+          "scheduledDate": "2026-07-16",
+          "missing": false
+        },
+        {
+          "id": "w2-06",
+          "type": "video",
+          "lessonNo": 6,
+          "title": "1.4信息系统与信息技术发展—数据存储技术",
+          "scheduledDate": "2026-07-17",
+          "missing": false
+        },
+        {
+          "id": "w2-07",
+          "type": "video",
+          "lessonNo": 7,
+          "title": "1.5信息系统与信息技术发展—信息安全",
+          "scheduledDate": "2026-07-18",
+          "missing": false
+        },
+        {
+          "id": "w2-08",
+          "type": "video",
+          "lessonNo": 8,
+          "title": "1.6信息系统与信息技术发展—新一代信息技术—物联网VS区块链",
+          "scheduledDate": "2026-07-19",
+          "missing": false
+        },
+        {
+          "id": "w2-09",
+          "type": "video",
+          "lessonNo": 9,
+          "title": "1.7信息系统与信息技术发展—新一代信息技术—云计算VS大数据",
+          "scheduledDate": "2026-07-20",
+          "missing": false
+        }
+      ]
+    },
+    {
+      "id": "W3",
+      "stage": "基础",
+      "phase": "输入期",
+      "focus": "第2章 数字中国与数智化发展",
+      "start": "2026-07-21",
+      "end": "2026-07-27",
+      "tasks": [
+        {
+          "id": "w3-11",
+          "type": "video",
+          "lessonNo": 11,
+          "title": "2.1数字中国与数智化发展—数字化转型VS数字中国概述",
+          "scheduledDate": "2026-07-21",
+          "missing": false
+        },
+        {
+          "id": "w3-12",
+          "type": "video",
+          "lessonNo": 12,
+          "title": "2.2数字中国与数智化发展—数字经济",
+          "scheduledDate": "2026-07-22",
+          "missing": false
+        },
+        {
+          "id": "w3-13",
+          "type": "video",
+          "lessonNo": 13,
+          "title": "2.3数字中国与数智化发展—数字生态VS数智化发展等",
+          "scheduledDate": "2026-07-23",
+          "missing": false
+        }
+      ]
+    },
+    {
+      "id": "W4",
+      "stage": "基础",
+      "phase": "输入期",
+      "focus": "第3-4章 系统方法论+信息系统规划",
+      "start": "2026-07-28",
+      "end": "2026-08-03",
+      "tasks": [
+        {
+          "id": "w4-14",
+          "type": "video",
+          "lessonNo": 14,
+          "title": "3.1系统科学与哲学方法论—矛盾论VS实践论",
+          "scheduledDate": "2026-07-28",
+          "missing": false
+        },
+        {
+          "id": "w4-21",
+          "type": "video",
+          "lessonNo": 21,
+          "title": "4.4信息系统规划常用方法",
+          "scheduledDate": "2026-07-28",
+          "missing": false
+        },
+        {
+          "id": "w4-15",
+          "type": "video",
+          "lessonNo": 15,
+          "title": "3.2系统科学与哲学方法论—系统论VS信息论",
+          "scheduledDate": "2026-07-29",
+          "missing": false
+        },
+        {
+          "id": "w4-16",
+          "type": "video",
+          "lessonNo": 16,
+          "title": "3.3系统科学与哲学方法论—控制论VS耗散论",
+          "scheduledDate": "2026-07-30",
+          "missing": false
+        },
+        {
+          "id": "w4-17",
+          "type": "video",
+          "lessonNo": 17,
+          "title": "3.4系统科学与哲学方法论—协同论VS复杂系统论",
+          "scheduledDate": "2026-07-31",
+          "missing": false
+        },
+        {
+          "id": "w4-18",
+          "type": "video",
+          "lessonNo": 18,
+          "title": "4.1信息系统规划—概述",
+          "scheduledDate": "2026-08-01",
+          "missing": false
+        },
+        {
+          "id": "w4-19",
+          "type": "video",
+          "lessonNo": 19,
+          "title": "4.2信息系统规划主要内容",
+          "scheduledDate": "2026-08-02",
+          "missing": false
+        },
+        {
+          "id": "w4-20",
+          "type": "video",
+          "lessonNo": 20,
+          "title": "4.3信息系统规划工作要点",
+          "scheduledDate": "2026-08-03",
+          "missing": false
+        }
+      ]
+    },
+    {
+      "id": "W5",
+      "stage": "规划",
+      "phase": "输入期",
+      "focus": "第5-6章 应用系统规划+云资源规划",
+      "start": "2026-08-04",
+      "end": "2026-08-10",
+      "tasks": [
+        {
+          "id": "w5-22",
+          "type": "video",
+          "lessonNo": 22,
+          "title": "5.1应用系统规划—概述",
+          "scheduledDate": "2026-08-04",
+          "missing": false
+        },
+        {
+          "id": "w5-29",
+          "type": "video",
+          "lessonNo": 29,
+          "title": "6.3 云资源规划-云数据中心规划",
+          "scheduledDate": "2026-08-04",
+          "missing": false
+        },
+        {
+          "id": "w5-23",
+          "type": "video",
+          "lessonNo": 23,
+          "title": "5.2应用系统规划—主要内容1",
+          "scheduledDate": "2026-08-05",
+          "missing": false
+        },
+        {
+          "id": "w5-24",
+          "type": "video",
+          "lessonNo": 24,
+          "title": "5.3应用系统规划—主要内容2",
+          "scheduledDate": "2026-08-06",
+          "missing": false
+        },
+        {
+          "id": "w5-25",
+          "type": "video",
+          "lessonNo": 25,
+          "title": "5.4 应用系统规划-主要过程",
+          "scheduledDate": "2026-08-07",
+          "missing": false
+        },
+        {
+          "id": "w5-26",
+          "type": "video",
+          "lessonNo": 26,
+          "title": "5.5应用系统规划-主要方法和软件工厂",
+          "scheduledDate": "2026-08-08",
+          "missing": false
+        },
+        {
+          "id": "w5-27",
+          "type": "video",
+          "lessonNo": 27,
+          "title": "6.1 云资源规划-概述VS体系架构",
+          "scheduledDate": "2026-08-09",
+          "missing": false
+        },
+        {
+          "id": "w5-28",
+          "type": "video",
+          "lessonNo": 28,
+          "title": "6.2 云资源规划-计算资源规划VS存储资源规划",
+          "scheduledDate": "2026-08-10",
+          "missing": false
+        }
+      ]
+    },
+    {
+      "id": "W6",
+      "stage": "规划",
+      "phase": "输入期",
+      "focus": "第7-8章 网络环境规划+数据资源规划",
+      "start": "2026-08-11",
+      "end": "2026-08-17",
+      "tasks": [
+        {
+          "id": "w6-30",
+          "type": "video",
+          "lessonNo": 30,
+          "title": "7.1 网络环境规划-网络架构主要技术1",
+          "scheduledDate": "2026-08-11",
+          "missing": false
+        },
+        {
+          "id": "w6-37",
+          "type": "video",
+          "lessonNo": 37,
+          "title": "8.3 数据资源规划-数据标准化",
+          "scheduledDate": "2026-08-11",
+          "missing": false
+        },
+        {
+          "id": "w6-31",
+          "type": "video",
+          "lessonNo": 31,
+          "title": "7.2 网络资源规划-网络架构主要技术2",
+          "scheduledDate": "2026-08-12",
+          "missing": false
+        },
+        {
+          "id": "w6-32",
+          "type": "video",
+          "lessonNo": 32,
+          "title": "7.3 网络资源规划-广域网规划",
+          "scheduledDate": "2026-08-13",
+          "missing": false
+        },
+        {
+          "id": "w6-33",
+          "type": "video",
+          "lessonNo": 33,
+          "title": "7.4 网络资源规划-局域网和无线网规划",
+          "scheduledDate": "2026-08-14",
+          "missing": true
+        },
+        {
+          "id": "w6-34",
+          "type": "video",
+          "lessonNo": 34,
+          "title": "7.5 网络资源规划-网络整体规划的重点事项",
+          "scheduledDate": "2026-08-15",
+          "missing": false
+        },
+        {
+          "id": "w6-35",
+          "type": "video",
+          "lessonNo": 35,
+          "title": "8.1 数据资源规划-概述vs数据资源规划方法",
+          "scheduledDate": "2026-08-16",
+          "missing": true
+        },
+        {
+          "id": "w6-36",
+          "type": "video",
+          "lessonNo": 36,
+          "title": "8.2 数据资源规划-数据架构",
+          "scheduledDate": "2026-08-17",
+          "missing": false
+        }
+      ]
+    },
+    {
+      "id": "W7",
+      "stage": "规划",
+      "phase": "输入期",
+      "focus": "第9-10章 信息安全规划+云原生系统规划",
+      "start": "2026-08-18",
+      "end": "2026-08-24",
+      "tasks": [
+        {
+          "id": "w7-38",
+          "type": "video",
+          "lessonNo": 38,
+          "title": "9.1 信息安全规划-概述",
+          "scheduledDate": "2026-08-18",
+          "missing": false
+        },
+        {
+          "id": "w7-39",
+          "type": "video",
+          "lessonNo": 39,
+          "title": "9.2 信息安全规划-安全架构和信息安全规划内容",
+          "scheduledDate": "2026-08-19",
+          "missing": false
+        },
+        {
+          "id": "w7-40",
+          "type": "video",
+          "lessonNo": 40,
+          "title": "10.1 云原生系统规划-云原生发展背景",
+          "scheduledDate": "2026-08-20",
+          "missing": false
+        },
+        {
+          "id": "w7-41",
+          "type": "video",
+          "lessonNo": 41,
+          "title": "10.2 云原生系统规划-云原生技术架构",
+          "scheduledDate": "2026-08-21",
+          "missing": false
+        },
+        {
+          "id": "w7-42",
+          "type": "video",
+          "lessonNo": 42,
+          "title": "10.3 元原生系统规划-云原生建设规划",
+          "scheduledDate": "2026-08-22",
+          "missing": false
+        }
+      ]
+    },
+    {
+      "id": "W8",
+      "stage": "管理",
+      "phase": "核心期",
+      "focus": "第11-12章 IT治理+IT服务管理（上）",
+      "start": "2026-08-25",
+      "end": "2026-08-31",
+      "tasks": [
+        {
+          "id": "w8-43",
+          "type": "video",
+          "lessonNo": 43,
+          "title": "11.1 信息系统治理-IT治理",
+          "scheduledDate": "2026-08-25",
+          "missing": false
+        },
+        {
+          "id": "w8-44",
+          "type": "video",
+          "lessonNo": 44,
+          "title": "11.2 信息系统治理-IT审计1",
+          "scheduledDate": "2026-08-26",
+          "missing": false
+        },
+        {
+          "id": "w8-45",
+          "type": "video",
+          "lessonNo": 45,
+          "title": "11.3 信息系统治理-IT审计2",
+          "scheduledDate": "2026-08-27",
+          "missing": false
+        },
+        {
+          "id": "w8-46",
+          "type": "video",
+          "lessonNo": 46,
+          "title": "12.1 信息系统服务管理-服务战略规划",
+          "scheduledDate": "2026-08-28",
+          "missing": false
+        },
+        {
+          "id": "w8-47",
+          "type": "video",
+          "lessonNo": 47,
+          "title": "12.2 信息系统服务管理-服务设计实现01",
+          "scheduledDate": "2026-08-29",
+          "missing": false
+        },
+        {
+          "id": "w8-48",
+          "type": "video",
+          "lessonNo": 48,
+          "title": "12.3 信息系统服务管理-服务设计实现02",
+          "scheduledDate": "2026-08-30",
+          "missing": false
+        }
+      ]
+    },
+    {
+      "id": "W9",
+      "stage": "管理",
+      "phase": "核心期",
+      "focus": "第12章 IT服务管理（下）★核心",
+      "start": "2026-09-01",
+      "end": "2026-09-07",
+      "tasks": [
+        {
+          "id": "w9-49",
+          "type": "video",
+          "lessonNo": 49,
+          "title": "12.4 信息系统服务管理-服务运营提升",
+          "scheduledDate": "2026-09-01",
+          "missing": false
+        },
+        {
+          "id": "w9-50",
+          "type": "video",
+          "lessonNo": 50,
+          "title": "12.5 信息系统服务管理-服务退役终止",
+          "scheduledDate": "2026-09-02",
+          "missing": false
+        },
+        {
+          "id": "w9-51",
+          "type": "video",
+          "lessonNo": 51,
+          "title": "12.6 信息系统服务管理-持续改进与监督",
+          "scheduledDate": "2026-09-03",
+          "missing": false
+        }
+      ]
+    },
+    {
+      "id": "W10",
+      "stage": "管理",
+      "phase": "巩固期",
+      "focus": "第13-17章 人员/规范/技术/工具/项目管理",
+      "start": "2026-09-08",
+      "end": "2026-09-14",
+      "tasks": [
+        {
+          "id": "w10-52",
+          "type": "video",
+          "lessonNo": 52,
+          "title": "13.1 人员管理-工作分析",
+          "scheduledDate": "2026-09-08",
+          "missing": false
+        },
+        {
+          "id": "w10-59",
+          "type": "video",
+          "lessonNo": 59,
+          "title": "14.2 规范与过程管理-流程规划和执行",
+          "scheduledDate": "2026-09-08",
+          "missing": false
+        },
+        {
+          "id": "w10-66",
+          "type": "video",
+          "lessonNo": 66,
+          "title": "16.3 资源与工具管理-项目管理工具",
+          "scheduledDate": "2026-09-08",
+          "missing": true
+        },
+        {
+          "id": "w10-53",
+          "type": "video",
+          "lessonNo": 53,
+          "title": "13.2 人员管理-岗位设计",
+          "scheduledDate": "2026-09-09",
+          "missing": false
+        },
+        {
+          "id": "w10-60",
+          "type": "video",
+          "lessonNo": 60,
+          "title": "14.3 规范与过程管理-流程评价与持续改进",
+          "scheduledDate": "2026-09-09",
+          "missing": false
+        },
+        {
+          "id": "w10-67",
+          "type": "video",
+          "lessonNo": 67,
+          "title": "17.1 信息系统项目管理-项目基本要素",
+          "scheduledDate": "2026-09-09",
+          "missing": true
+        },
+        {
+          "id": "w10-54",
+          "type": "video",
+          "lessonNo": 54,
+          "title": "13.3 人员管理-人力资源战略与计划",
+          "scheduledDate": "2026-09-10",
+          "missing": false
+        },
+        {
+          "id": "w10-61",
+          "type": "video",
+          "lessonNo": 61,
+          "title": "15.1 技术与研发管理-技术研发管理",
+          "scheduledDate": "2026-09-10",
+          "missing": false
+        },
+        {
+          "id": "w10-68",
+          "type": "video",
+          "lessonNo": 68,
+          "title": "第68节",
+          "scheduledDate": "2026-09-10",
+          "missing": true
+        },
+        {
+          "id": "w10-55",
+          "type": "video",
+          "lessonNo": 55,
+          "title": "13.4 人员管理-人员招聘与录用",
+          "scheduledDate": "2026-09-11",
+          "missing": false
+        },
+        {
+          "id": "w10-62",
+          "type": "video",
+          "lessonNo": 62,
+          "title": "15.2 技术与研发管理-技术研发应用",
+          "scheduledDate": "2026-09-11",
+          "missing": false
+        },
+        {
+          "id": "w10-69",
+          "type": "video",
+          "lessonNo": 69,
+          "title": "17.3 信息系统项目管理-价值驱动的项目管理知识体系",
+          "scheduledDate": "2026-09-11",
+          "missing": false
+        },
+        {
+          "id": "w10-56",
+          "type": "video",
+          "lessonNo": 56,
+          "title": "13.5 人员管理-人员培训与绩效管理",
+          "scheduledDate": "2026-09-12",
+          "missing": false
+        },
+        {
+          "id": "w10-63",
+          "type": "video",
+          "lessonNo": 63,
+          "title": "15.3 技术与研发管理-知识产权管理",
+          "scheduledDate": "2026-09-12",
+          "missing": false
+        },
+        {
+          "id": "w10-57",
+          "type": "video",
+          "lessonNo": 57,
+          "title": "13.6 人员管理-薪酬管理VS职业规划",
+          "scheduledDate": "2026-09-13",
+          "missing": false
+        },
+        {
+          "id": "w10-64",
+          "type": "video",
+          "lessonNo": 64,
+          "title": "16.1 资源与工具管理-研发与测试管理",
+          "scheduledDate": "2026-09-13",
+          "missing": false
+        },
+        {
+          "id": "w10-58",
+          "type": "video",
+          "lessonNo": 58,
+          "title": "14.1 规范与过程管理-管理标准化",
+          "scheduledDate": "2026-09-14",
+          "missing": false
+        },
+        {
+          "id": "w10-65",
+          "type": "video",
+          "lessonNo": 65,
+          "title": "16.2 资源与工具管理-运维工具",
+          "scheduledDate": "2026-09-14",
+          "missing": true
+        }
+      ]
+    },
+    {
+      "id": "W11",
+      "stage": "专项",
+      "phase": "巩固期",
+      "focus": "第18-20章 智慧城市/园区/数字乡村",
+      "start": "2026-09-15",
+      "end": "2026-09-21",
+      "tasks": [
+        {
+          "id": "w11-70",
+          "type": "video",
+          "lessonNo": 70,
+          "title": "18.1 智慧城市发展规划-发展整体环境和发展关注焦点",
+          "scheduledDate": "2026-09-15",
+          "missing": false
+        },
+        {
+          "id": "w11-71",
+          "type": "video",
+          "lessonNo": 71,
+          "title": "18.2 智慧城市规划-规划要点和系统架构",
+          "scheduledDate": "2026-09-16",
+          "missing": false
+        },
+        {
+          "id": "w11-72",
+          "type": "video",
+          "lessonNo": 72,
+          "title": "19.1 智慧园区发展规划-发展宏观环境和发展关键点",
+          "scheduledDate": "2026-09-17",
+          "missing": false
+        },
+        {
+          "id": "w11-73",
+          "type": "video",
+          "lessonNo": 73,
+          "title": "19.2 智慧园区发展规划-发展规划要点和案例",
+          "scheduledDate": "2026-09-18",
+          "missing": false
+        },
+        {
+          "id": "w11-74",
+          "type": "video",
+          "lessonNo": 74,
+          "title": "20.1 数字乡村发展规划-发展环境VS发展关键焦点",
+          "scheduledDate": "2026-09-19",
+          "missing": false
+        },
+        {
+          "id": "w11-75",
+          "type": "video",
+          "lessonNo": 75,
+          "title": "20.2 数字乡村发展规划-发展规划要点VS主要架构",
+          "scheduledDate": "2026-09-20",
+          "missing": false
+        }
+      ]
+    },
+    {
+      "id": "W12",
+      "stage": "专项",
+      "phase": "巩固期",
+      "focus": "第21-24章 企业转型/智能制造/消费/法规",
+      "start": "2026-09-22",
+      "end": "2026-09-28",
+      "tasks": [
+        {
+          "id": "w12-76",
+          "type": "video",
+          "lessonNo": 76,
+          "title": "21.1 企业数字化转型发展规划-转型驱动力VS转型关注焦点",
+          "scheduledDate": "2026-09-22",
+          "missing": false
+        },
+        {
+          "id": "w12-83",
+          "type": "video",
+          "lessonNo": 83,
+          "title": "24.法律法规和标准规范",
+          "scheduledDate": "2026-09-22",
+          "missing": false
+        },
+        {
+          "id": "w12-77",
+          "type": "video",
+          "lessonNo": 77,
+          "title": "21.2 企业数字化转型-转型能力成熟度",
+          "scheduledDate": "2026-09-23",
+          "missing": false
+        },
+        {
+          "id": "w12-78",
+          "type": "video",
+          "lessonNo": 78,
+          "title": "21.3 企业数字化转型发展规划-转型规划要点及架构",
+          "scheduledDate": "2026-09-24",
+          "missing": false
+        },
+        {
+          "id": "w12-79",
+          "type": "video",
+          "lessonNo": 79,
+          "title": "22.1 智能制造发展规划-发展整体环境VS发展关注焦点",
+          "scheduledDate": "2026-09-25",
+          "missing": false
+        },
+        {
+          "id": "w12-80",
+          "type": "video",
+          "lessonNo": 80,
+          "title": "22.2 智能制造发展规划-成熟度模型vs系统架构",
+          "scheduledDate": "2026-09-26",
+          "missing": false
+        },
+        {
+          "id": "w12-81",
+          "type": "video",
+          "lessonNo": 81,
+          "title": "23.1 新型消费系统规划-宏观环境VS关注焦点",
+          "scheduledDate": "2026-09-27",
+          "missing": false
+        },
+        {
+          "id": "w12-82",
+          "type": "video",
+          "lessonNo": 82,
+          "title": "23.2 新型消费系统规划-规划要点VS系统架构",
+          "scheduledDate": "2026-09-28",
+          "missing": false
+        }
+      ]
+    },
+    {
+      "id": "W13",
+      "stage": "专题",
+      "phase": "输出期",
+      "focus": "论文写作规则+IT服务论文素材准备",
+      "start": "2026-09-29",
+      "end": "2026-10-05",
+      "tasks": [
+        {
+          "id": "w13-903",
+          "type": "video",
+          "lessonNo": 903,
+          "title": "26.1 论文写作专题-论文写作概述",
+          "scheduledDate": "2026-09-29",
+          "missing": false
+        },
+        {
+          "id": "w13-904",
+          "type": "video",
+          "lessonNo": 904,
+          "title": "26.2 论文专题-论文写作框架",
+          "scheduledDate": "2026-09-30",
+          "missing": false
+        },
+        {
+          "id": "w13-905",
+          "type": "video",
+          "lessonNo": 905,
+          "title": "26.3 论文专题-模拟题及点评",
+          "scheduledDate": "2026-10-01",
+          "missing": false
+        }
+      ]
+    },
+    {
+      "id": "W14",
+      "stage": "专题",
+      "phase": "输出期",
+      "focus": "案例专题+综合知识串讲+一模",
+      "start": "2026-10-06",
+      "end": "2026-10-12",
+      "tasks": [
+        {
+          "id": "w14-901",
+          "type": "video",
+          "lessonNo": 901,
+          "title": "25.1 案例分析专题一",
+          "scheduledDate": "2026-10-06",
+          "missing": false
+        },
+        {
+          "id": "w14-902",
+          "type": "video",
+          "lessonNo": 902,
+          "title": "25.2 案例分析专题二",
+          "scheduledDate": "2026-10-07",
+          "missing": false
+        }
+      ]
+    },
+    {
+      "id": "W15",
+      "stage": "冲刺",
+      "phase": "冲刺期",
+      "focus": "综合题刷题+二模+错题复盘",
+      "start": "2026-10-13",
+      "end": "2026-10-19",
+      "tasks": []
+    },
+    {
+      "id": "W16",
+      "stage": "冲刺",
+      "phase": "冲刺期",
+      "focus": "考前串讲+查缺补漏+调整状态",
+      "start": "2026-10-20",
+      "end": "2026-10-23",
+      "tasks": []
+    }
+  ]
+}
