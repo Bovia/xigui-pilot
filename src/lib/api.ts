@@ -80,6 +80,9 @@ export const getPanelPinned = () => invoke<boolean>("get_panel_pinned");
 export const setPanelPinned = (pinned: boolean) =>
   invoke<Settings>("set_panel_pinned", { pinned });
 
+export const setWovenStyle = (enabled: boolean) =>
+  invoke<Settings>("set_woven_style", { enabled });
+
 export const getProgress = () =>
   invoke<{
     videos: Record<

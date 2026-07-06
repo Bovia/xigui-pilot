@@ -25,8 +25,8 @@ export default function EyeRestPrompt({
     return (
       <div
         className={`absolute inset-0 z-50 flex items-center justify-center ${
-          dark ? "bg-slate-950/85" : "bg-white/90"
-        } backdrop-blur-sm`}
+          dark ? "bg-slate-950" : "bg-white"
+        }`}
       >
         <div className="px-6 text-center">
           <div
@@ -61,9 +61,9 @@ export default function EyeRestPrompt({
     <div
       className={`absolute inset-x-0 bottom-0 z-50 border-t px-4 py-3 ${
         dark
-          ? "border-slate-700 bg-slate-900/95 text-slate-100"
-          : "border-amber-100 bg-amber-50/95 text-slate-800"
-      } backdrop-blur-sm`}
+          ? "border-slate-700 bg-slate-900 text-slate-100"
+          : "border-amber-100 bg-amber-50 text-slate-800"
+      }`}
     >
       <div className="text-sm font-medium">👁 该让眼睛休息一下了</div>
       <p

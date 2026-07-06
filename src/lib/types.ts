@@ -34,6 +34,7 @@ export interface Settings {
   rootDir?: string | null;
   textbookDir?: string | null;
   panelPinned?: boolean | null;
+  wovenStyle?: boolean | null;
 }
 
 export interface PlanLesson {

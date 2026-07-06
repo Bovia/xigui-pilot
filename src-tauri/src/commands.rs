@@ -439,6 +439,14 @@ pub fn set_panel_pinned(app: AppHandle, pinned: bool) -> Result<Settings, String
 }
 
 #[tauri::command]
+pub fn set_woven_style(app: AppHandle, enabled: bool) -> Result<Settings, String> {
+    let (path, mut settings) = settings_for(&app)?;
+    settings.woven_style = Some(enabled);
+    settings.save(&path)?;
+    Ok(settings)
+}
+
+#[tauri::command]
 pub fn get_progress(app: AppHandle) -> Result<ProgressStore, String> {
     let (_, progress) = progress_for(&app)?;
     Ok(progress)

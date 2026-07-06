@@ -3,6 +3,7 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 import {
   getProgress,
   getPanelPinned,
+  getSettings,
   getTodaySnapshot,
   loadPlan,
   loadQuiz,
@@ -15,6 +16,7 @@ import {
   pickTextbook,
   quitApp,
   setPanelPinned,
+  setWovenStyle,
 } from "../lib/api";
 import type { CatalogLesson, PlanFile, TextbookFile, TodaySnapshot } from "../lib/types";
 import {
@@ -182,7 +184,7 @@ function CatalogSectionBlock({
         type="button"
         onClick={() => onToggle(id)}
         aria-expanded={expanded}
-        className="sticky top-0 z-10 flex w-full items-center justify-between rounded-lg bg-white/95 px-2 py-1.5 text-left backdrop-blur-sm transition hover:bg-slate-50"
+        className="catalog-section-header sticky top-0 z-10 flex w-full items-center justify-between rounded-lg bg-white px-2 py-1.5 text-left transition hover:bg-slate-50"
       >
         <span className="flex min-w-0 items-center gap-1.5">
           <ChevronIcon expanded={expanded} />
@@ -190,7 +192,7 @@ function CatalogSectionBlock({
           <span className="shrink-0 text-[10px] text-slate-400">{lessons.length} 节</span>
         </span>
         {weekCount > 0 && (
-          <span className="ml-2 shrink-0 rounded bg-blue-100 px-1.5 py-0.5 text-[9px] font-medium text-blue-600">
+          <span className="woven-badge-week ml-2 shrink-0 rounded bg-blue-100 px-1.5 py-0.5 text-[9px] font-medium text-blue-600">
             本周 {weekCount}
           </span>
         )}
@@ -215,7 +217,7 @@ function CatalogSectionBlock({
 }
 
 const headerBtn =
-  "flex h-10 w-10 items-center justify-center rounded-xl text-slate-500 transition hover:bg-slate-100 hover:text-slate-700";
+  "panel-header-btn flex h-10 w-10 items-center justify-center rounded-xl text-slate-500 transition hover:bg-slate-100 hover:text-slate-700";
 
 function LessonRow({
   lesson,
@@ -235,11 +237,12 @@ function LessonRow({
   const pct = progressPercent(lesson.position, lesson.duration, lesson.completed);
   const quizTip = quizTooltip(lesson.title, quizName);
   const bookTip = textbookTooltip(lesson.textbookPage);
+  const showStudyExtras = lesson.category !== "special";
 
   return (
     <div
-      className={`relative rounded-xl border px-3 py-2.5 transition ${
-        isThisWeek ? "border-blue-200/80 bg-blue-50/30" : "border-slate-200/80 bg-white"
+      className={`lesson-card relative rounded-xl border px-3 py-2.5 transition ${
+        isThisWeek ? "lesson-card--week border-blue-200/80 bg-blue-50/30" : "border-slate-200/80 bg-white"
       } ${lesson.completed ? "opacity-75" : ""} ${lesson.missing ? "opacity-45" : ""}`}
     >
       {isThisWeek && (
@@ -252,7 +255,7 @@ function LessonRow({
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-1.5">
             {isThisWeek && (
-              <span className="shrink-0 rounded bg-blue-100 px-1 py-0.5 text-[9px] font-medium text-blue-600">
+              <span className="woven-badge-week shrink-0 rounded bg-blue-100 px-1 py-0.5 text-[9px] font-medium text-blue-600">
                 本周
               </span>
             )}
@@ -261,9 +264,9 @@ function LessonRow({
             </div>
           </div>
           <div className="mt-1 flex items-center gap-2">
-            <div className="h-1 min-w-0 flex-1 overflow-hidden rounded-full bg-slate-100">
+            <div className="woven-progress-track h-1 min-w-0 flex-1 overflow-hidden rounded-full bg-slate-100">
               <div
-                className="h-full rounded-full bg-blue-500"
+                className="woven-progress-fill h-full rounded-full bg-blue-500"
                 style={{ width: `${pct}%` }}
               />
             </div>
@@ -273,30 +276,34 @@ function LessonRow({
           </div>
         </div>
         <div className="flex shrink-0 items-center gap-1.5">
-          <Tooltip label={quizTip.label} detail={quizTip.detail}>
-            <button
-              type="button"
-              onClick={() => onQuiz(lesson)}
-              className="flex h-8 w-8 items-center justify-center rounded-full border border-emerald-200 bg-emerald-50 text-[10px] font-medium text-emerald-600 hover:bg-emerald-100"
-            >
-              题
-            </button>
-          </Tooltip>
-          <Tooltip label={bookTip.label} detail={bookTip.detail}>
-            <button
-              type="button"
-              onClick={() => onTextbook(lesson)}
-              className="flex h-8 w-8 items-center justify-center rounded-full border border-amber-200 bg-amber-50 text-[10px] font-medium text-amber-700 hover:bg-amber-100"
-            >
-              书
-            </button>
-          </Tooltip>
+          {showStudyExtras && (
+            <>
+              <Tooltip label={quizTip.label} detail={quizTip.detail}>
+                <button
+                  type="button"
+                  onClick={() => onQuiz(lesson)}
+                  className="woven-btn-tag flex h-8 w-8 items-center justify-center rounded-full border border-emerald-200 bg-emerald-50 text-[10px] font-medium text-emerald-600 hover:bg-emerald-100"
+                >
+                  题
+                </button>
+              </Tooltip>
+              <Tooltip label={bookTip.label} detail={bookTip.detail}>
+                <button
+                  type="button"
+                  onClick={() => onTextbook(lesson)}
+                  className="woven-btn-tag flex h-8 w-8 items-center justify-center rounded-full border border-amber-200 bg-amber-50 text-[10px] font-medium text-amber-700 hover:bg-amber-100"
+                >
+                  书
+                </button>
+              </Tooltip>
+            </>
+          )}
           <Tooltip label="播放课程">
             <button
               type="button"
               disabled={lesson.missing}
               onClick={() => onPlay(lesson)}
-              className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-500 text-white shadow-sm hover:bg-blue-600 disabled:bg-slate-300"
+              className="woven-btn-play flex h-8 w-8 items-center justify-center rounded-full bg-blue-500 text-white shadow-sm hover:bg-blue-600 disabled:bg-slate-300"
             >
               <PlayIcon />
             </button>
@@ -343,6 +350,7 @@ export default function TodayPanel() {
   const [eyeRestOn, setEyeRestOn] = useState(isEyeRestEnabled);
   const [quizName, setQuizName] = useState("郑房新一点通");
   const [pinned, setPinned] = useState(true);
+  const [wovenStyle, setWovenStyleOn] = useState(false);
   const [guideOpen, setGuideOpen] = useState(false);
   const [expandedSections, setExpandedSections] = useState(loadExpandedSections);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -411,7 +419,19 @@ export default function TodayPanel() {
     getPanelPinned()
       .then(setPinned)
       .catch(() => undefined);
+    getSettings()
+      .then((s) => setWovenStyleOn(s.wovenStyle ?? false))
+      .catch(() => undefined);
   }, [refresh]);
+
+  useEffect(() => {
+    document.documentElement.classList.add("panel-view");
+    return () => document.documentElement.classList.remove("panel-view");
+  }, []);
+
+  useEffect(() => {
+    document.documentElement.classList.toggle("theme-woven", wovenStyle);
+  }, [wovenStyle]);
 
   useEffect(() => {
     if (!menuOpen) return;
@@ -480,6 +500,16 @@ export default function TodayPanel() {
     }
   };
 
+  const toggleWovenStyle = async () => {
+    const next = !wovenStyle;
+    try {
+      await setWovenStyle(next);
+      setWovenStyleOn(next);
+    } catch (e) {
+      setError(String(e));
+    }
+  };
+
   const weekPct =
     snapshot && snapshot.weekTotal
       ? Math.round((snapshot.weekDone / snapshot.weekTotal) * 100)
@@ -489,7 +519,7 @@ export default function TodayPanel() {
   const weekLessonSet = new Set(snapshot?.weekLessonNos ?? []);
 
   return (
-    <div className="panel-shell relative h-full overflow-hidden rounded-2xl">
+    <div className={`panel-shell relative h-full overflow-hidden rounded-2xl${wovenStyle ? " theme-woven" : ""}`}>
       <HelpGuide
         open={guideOpen}
         quizName={quizName}
@@ -504,7 +534,7 @@ export default function TodayPanel() {
             <div className="text-[15px] font-semibold text-slate-900">
               今日任务
               {(snapshot?.todayPending ?? 0) > 0 && (
-                <span className="ml-1.5 rounded-full bg-rose-500 px-1.5 py-0.5 text-[10px] font-medium text-white">
+                <span className="woven-badge-count ml-1.5 rounded-full bg-rose-500 px-1.5 py-0.5 text-[10px] font-medium text-white">
                   {snapshot?.todayPending}
                 </span>
               )}
@@ -542,7 +572,7 @@ export default function TodayPanel() {
                 </button>
               </Tooltip>
             {menuOpen && (
-              <div className="absolute right-0 top-full z-20 mt-1 min-w-[168px] overflow-hidden rounded-xl border border-slate-200/80 bg-white py-1 shadow-lg">
+              <div className="settings-menu absolute right-0 top-full z-20 mt-1 min-w-[168px] overflow-hidden rounded-xl border border-slate-200/80 bg-white py-1 shadow-lg">
                 <button
                   type="button"
                   disabled={picking || pickingTextbook}
@@ -569,6 +599,13 @@ export default function TodayPanel() {
                   className="w-full px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50"
                 >
                   {eyeRestOn ? "✓ 护眼提醒（20-20-20）" : "护眼提醒（20-20-20）"}
+                </button>
+                <button
+                  type="button"
+                  onClick={toggleWovenStyle}
+                  className="w-full px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50"
+                >
+                  {wovenStyle ? "✓ 织物质感" : "织物质感"}
                 </button>
                 <button
                   type="button"
@@ -605,9 +642,9 @@ export default function TodayPanel() {
               </span>
               <span>{weekPct}%</span>
             </div>
-            <div className="h-1.5 overflow-hidden rounded-full bg-slate-100">
+            <div className="woven-progress-track h-1.5 overflow-hidden rounded-full bg-slate-100">
               <div
-                className="h-full rounded-full bg-blue-500 transition-all"
+                className="woven-progress-fill h-full rounded-full bg-blue-500 transition-all"
                 style={{ width: `${weekPct}%` }}
               />
             </div>
@@ -630,7 +667,7 @@ export default function TodayPanel() {
           </div>
         )}
 
-        <div className="min-h-0 flex-1 space-y-1.5 overflow-y-auto overflow-x-visible pr-0.5">
+        <div className="min-h-0 flex-1 space-y-1.5 overflow-x-hidden overflow-y-auto pr-0.5">
           {loading && <div className="text-sm text-slate-500">加载中…</div>}
           {error && (
             <div className="rounded-xl bg-rose-50 px-3 py-2 text-sm text-rose-600">

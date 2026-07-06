@@ -72,6 +72,7 @@ pub fn run() {
             commands::open_quiz,
             commands::get_panel_pinned,
             commands::set_panel_pinned,
+            commands::set_woven_style,
             commands::quit_app,
         ])
         .build(tauri::generate_context!())

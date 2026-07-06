@@ -404,14 +404,14 @@
     "33": {
       "no": 33,
       "title": "7.4 网络资源规划-局域网和无线网规划",
-      "filename": "[33]--7.4 网络资源规划-局域网和无线网规划.mp4.baiduyun.p.downloading",
-      "ext": ".downloading",
+      "filename": "[33]--7.4 网络资源规划-局域网和无线网规划.mp4",
+      "ext": ".mp4",
       "category": "basic",
       "videoSubdir": "01：基础课视频（已完结）",
-      "playable": false,
-      "builtinPlayable": false,
-      "missing": true,
-      "durationSec": 0
+      "playable": true,
+      "builtinPlayable": true,
+      "missing": false,
+      "durationSec": 3543
     },
     "34": {
       "no": 34,
@@ -813,6 +813,18 @@
       "no": 67,
       "title": "17.1 信息系统项目管理-项目基本要素",
       "filename": "[67]--17.1 信息系统项目管理-项目基本要素.mp4.baiduyun.p.downloading",
+      "ext": ".downloading",
+      "category": "basic",
+      "videoSubdir": "01：基础课视频（已完结）",
+      "playable": false,
+      "builtinPlayable": false,
+      "missing": true,
+      "durationSec": 0
+    },
+    "68": {
+      "no": 68,
+      "title": "17.2 信息系统项目管理-项目经理角色",
+      "filename": "[68]--17.2 信息系统项目管理-项目经理角色.mp4.baiduyun.p.downloading",
       "ext": ".downloading",
       "category": "basic",
       "videoSubdir": "01：基础课视频（已完结）",
@@ -1391,7 +1403,7 @@
           "lessonNo": 33,
           "title": "7.4 网络资源规划-局域网和无线网规划",
           "scheduledDate": "2026-08-14",
-          "missing": true
+          "missing": false
         },
         {
           "id": "w6-34",
@@ -1637,7 +1649,7 @@
           "id": "w10-68",
           "type": "video",
           "lessonNo": 68,
-          "title": "第68节",
+          "title": "17.2 信息系统项目管理-项目经理角色",
           "scheduledDate": "2026-09-10",
           "missing": true
         },

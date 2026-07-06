@@ -10,6 +10,8 @@ pub struct Settings {
     pub textbook_dir: Option<String>,
     #[serde(default)]
     pub panel_pinned: Option<bool>,
+    #[serde(default)]
+    pub woven_style: Option<bool>,
 }
 
 impl Default for Settings {
@@ -18,6 +20,7 @@ impl Default for Settings {
             root_dir: None,
             textbook_dir: None,
             panel_pinned: Some(true),
+            woven_style: Some(false),
         }
     }
 }
