@@ -124,13 +124,14 @@ function catalogSections(catalog: CatalogLesson[]) {
 const SECTION_EXPAND_KEY = "xigui-catalog-sections";
 
 function loadExpandedSections(): Record<string, boolean> {
+  const defaults = { basic: true, special: true };
   try {
     const raw = localStorage.getItem(SECTION_EXPAND_KEY);
-    if (raw) return JSON.parse(raw) as Record<string, boolean>;
+    if (raw) return { ...defaults, ...(JSON.parse(raw) as Record<string, boolean>) };
   } catch {
     /* ignore */
   }
-  return { basic: true, special: true };
+  return defaults;
 }
 
 function ChevronIcon({ expanded }: { expanded: boolean }) {
