@@ -27,6 +27,7 @@ import {
 import { quizTooltip } from "../lib/quiz";
 import Tooltip from "../components/Tooltip";
 import HelpGuide from "../components/HelpGuide";
+import StudyPlanSheet from "../components/StudyPlanSheet";
 
 function formatDate(date: string) {
   const d = new Date(`${date}T00:00:00`);
@@ -100,6 +101,31 @@ function PinIcon({ pinned }: { pinned: boolean }) {
       <path d="M12 10V3" />
       <path d="M9 3h6l-1 7" />
       {!pinned && <path d="m4 4 16 16" />}
+    </svg>
+  );
+}
+
+function CalendarIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      className="h-[22px] w-[22px]"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.75"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      <path d="M8 2v4" />
+      <path d="M16 2v4" />
+      <rect x="3" y="4" width="18" height="18" rx="2" />
+      <path d="M3 10h18" />
+      <path d="M8 14h.01" />
+      <path d="M12 14h.01" />
+      <path d="M16 14h.01" />
+      <path d="M8 18h.01" />
+      <path d="M12 18h.01" />
     </svg>
   );
 }
@@ -352,6 +378,7 @@ export default function TodayPanel() {
   const [pinned, setPinned] = useState(true);
   const [wovenStyle, setWovenStyleOn] = useState(false);
   const [guideOpen, setGuideOpen] = useState(false);
+  const [planOpen, setPlanOpen] = useState(false);
   const [expandedSections, setExpandedSections] = useState(loadExpandedSections);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -525,6 +552,12 @@ export default function TodayPanel() {
         quizName={quizName}
         onClose={() => setGuideOpen(false)}
       />
+      <StudyPlanSheet
+        open={planOpen}
+        onClose={() => setPlanOpen(false)}
+        currentWeekId={snapshot?.weekId}
+        daysToExam={snapshot?.daysToExam}
+      />
       <div className="flex h-full flex-col p-4">
         <div className="mb-3 flex items-start justify-between gap-2">
           <div
@@ -558,6 +591,20 @@ export default function TodayPanel() {
                 className={`${headerBtn} ${pinned ? "bg-blue-50 text-blue-600 hover:bg-blue-100 hover:text-blue-700" : ""}`}
               >
                 <PinIcon pinned={pinned} />
+              </button>
+            </Tooltip>
+            <Tooltip label="学习计划表">
+              <button
+                type="button"
+                onClick={() => {
+                  setMenuOpen(false);
+                  setPlanOpen(true);
+                }}
+                aria-label="学习计划表"
+                aria-pressed={planOpen}
+                className={`${headerBtn} ${planOpen ? "bg-slate-100 text-slate-700" : ""}`}
+              >
+                <CalendarIcon />
               </button>
             </Tooltip>
             <div className="relative" ref={menuRef}>

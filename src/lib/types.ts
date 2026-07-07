@@ -65,6 +65,26 @@ export interface TextbookFile {
   lessons: Record<string, { page: number }>;
 }
 
+export interface PlanWeek {
+  id: string;
+  stage: string;
+  phase: string;
+  focus: string;
+  start: string;
+  end: string;
+  tasks?: Array<{
+    id: string;
+    type: string;
+    lessonNo?: number;
+    title: string;
+    scheduledDate?: string;
+    missing?: boolean;
+  }>;
+}
+
 export interface PlanFile {
+  examDate?: string;
+  startDate?: string;
+  weeks?: PlanWeek[];
   lessons: Record<string, PlanLesson>;
 }
