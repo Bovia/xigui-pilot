@@ -13,7 +13,7 @@ export default function HelpGuide({ open, quizName, onClose }: Props) {
       onClick={onClose}
     >
       <div
-        className="max-h-[85%] w-full overflow-y-auto rounded-2xl border border-slate-200/80 bg-white p-4 shadow-xl"
+        className="panel-scroll max-h-[85%] w-full overflow-y-auto rounded-2xl border border-slate-200/80 bg-white p-4 shadow-xl"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="mb-3 flex items-center justify-between gap-2">

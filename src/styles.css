@@ -44,6 +44,54 @@ button {
   height: 100%;
 }
 
+/* ── 面板滚动条 ── */
+.panel-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(148, 163, 184, 0.45) transparent;
+}
+
+.panel-scroll::-webkit-scrollbar {
+  width: 5px;
+}
+
+.panel-scroll::-webkit-scrollbar-track {
+  background: transparent;
+  margin: 4px 0;
+}
+
+.panel-scroll::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.4);
+  border-radius: 999px;
+  border: 1px solid transparent;
+  background-clip: padding-box;
+  transition: background 200ms ease;
+}
+
+.panel-scroll::-webkit-scrollbar-thumb:hover {
+  background: rgba(100, 116, 139, 0.55);
+}
+
+.panel-scroll::-webkit-scrollbar-thumb:active {
+  background: rgba(71, 85, 105, 0.65);
+}
+
+.panel-shell.theme-woven .panel-scroll {
+  scrollbar-color: rgba(166, 124, 82, 0.42) transparent;
+}
+
+.panel-shell.theme-woven .panel-scroll::-webkit-scrollbar-thumb {
+  background: rgba(166, 124, 82, 0.32);
+  box-shadow: inset 0 0 0 1px rgba(255, 252, 247, 0.35);
+}
+
+.panel-shell.theme-woven .panel-scroll::-webkit-scrollbar-thumb:hover {
+  background: rgba(139, 115, 85, 0.52);
+}
+
+.panel-shell.theme-woven .panel-scroll::-webkit-scrollbar-thumb:active {
+  background: rgba(107, 79, 50, 0.62);
+}
+
 /* ── 织物质感主题 ── */
 .panel-shell.theme-woven {
   --woven-linen: #f5f0e8;

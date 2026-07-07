@@ -667,7 +667,7 @@ export default function TodayPanel() {
           </div>
         )}
 
-        <div className="min-h-0 flex-1 space-y-1.5 overflow-x-hidden overflow-y-auto pr-0.5">
+        <div className="panel-scroll min-h-0 flex-1 space-y-1.5 overflow-x-hidden overflow-y-auto pr-1">
           {loading && <div className="text-sm text-slate-500">加载中…</div>}
           {error && (
             <div className="rounded-xl bg-rose-50 px-3 py-2 text-sm text-rose-600">
