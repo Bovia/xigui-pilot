@@ -1,6 +1,7 @@
+use crate::catalog::{self, CatalogSnapshot};
 use crate::progress::{progress_path, ProgressStore, VideoProgress};
 use crate::settings::{settings_path, Settings};
-use crate::{activate_for_action, ensure_player_window, restore_accessory, set_panel_hide_suppressed};
+use crate::{activate_for_action, restore_accessory, set_panel_hide_suppressed};
 use chrono::{Local, NaiveDate};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -268,17 +269,17 @@ pub(crate) fn count_current_week_unwatched(app: &AppHandle) -> Result<u32, Strin
 }
 
 pub(crate) fn tray_badge_count(app: &AppHandle) -> Result<TrayBadge, String> {
-    let plan = load_plan()?;
-    let today_count = count_today_unwatched(app)?;
-    if has_today_video_tasks(&plan) {
+    let (_, settings) = settings_for(app)?;
+    let Some(root) = settings.root_dir.as_deref() else {
         return Ok(TrayBadge {
-            count: today_count,
+            count: 0,
             today_scope: true,
         });
-    }
+    };
+    let (_, progress) = progress_for(app)?;
     Ok(TrayBadge {
-        count: count_current_week_unwatched(app)?,
-        today_scope: false,
+        count: catalog::count_incomplete(root, &progress),
+        today_scope: true,
     })
 }
 pub(crate) fn count_today_unwatched(app: &AppHandle) -> Result<u32, String> {
@@ -340,11 +341,15 @@ pub fn get_settings(app: AppHandle) -> Result<Settings, String> {
 
 #[tauri::command]
 pub fn set_root_dir(app: AppHandle, root_dir: String) -> Result<Settings, String> {
-    let plan = load_plan()?;
-    let (path, mut settings) = settings_for(&app)?;
-    let video_subdir = video_subdir_from_plan(&plan);
-    settings.root_dir = Some(normalize_material_root(&root_dir, &video_subdir));
-    settings.save(&path)?;
+    let trimmed = root_dir.trim();
+    let path = Path::new(trimmed);
+    if !path.is_dir() {
+        return Err(format!("不是有效文件夹：{trimmed}"));
+    }
+    let (settings_path, mut settings) = settings_for(&app)?;
+    settings.root_dir = Some(path.to_string_lossy().to_string());
+    settings.save(&settings_path)?;
+    crate::refresh_tray_badge(&app);
     Ok(settings)
 }
 
@@ -455,10 +460,13 @@ pub fn get_progress(app: AppHandle) -> Result<ProgressStore, String> {
 #[tauri::command]
 pub fn save_video_progress(
     app: AppHandle,
-    lesson_no: u32,
+    video_id: String,
     position: f64,
     duration: f64,
 ) -> Result<VideoProgress, String> {
+    if video_id.contains("..") {
+        return Err("无效的视频路径".into());
+    }
     let (path, mut progress) = progress_for(&app)?;
     let completed = duration > 0.0 && position / duration >= 0.9;
     let entry = VideoProgress {
@@ -467,12 +475,20 @@ pub fn save_video_progress(
         completed,
         updated_at: Local::now().to_rfc3339(),
     };
-    progress
-        .videos
-        .insert(lesson_no.to_string(), entry.clone());
+    progress.videos.insert(video_id, entry.clone());
     progress.save(&path)?;
     crate::refresh_tray_badge(&app);
     Ok(entry)
+}
+
+#[tauri::command]
+pub fn get_catalog(app: AppHandle) -> Result<CatalogSnapshot, String> {
+    let (_, settings) = settings_for(&app)?;
+    let (_, progress) = progress_for(&app)?;
+    Ok(catalog::build_snapshot(
+        settings.root_dir.as_deref(),
+        &progress,
+    ))
 }
 
 #[tauri::command]
@@ -654,44 +670,26 @@ pub fn get_today_snapshot(app: AppHandle) -> Result<TodaySnapshot, String> {
     })
 }
 
-fn resolve_video_path_inner(app: &AppHandle, lesson_no: u32) -> Result<String, String> {
-    let plan = load_plan()?;
-    let settings = ensure_normalized_settings(app, &plan)?;
-    let root = settings.root_dir.ok_or("请先选择资料根目录")?;
-
-    let lesson = plan
-        .get("lessons")
-        .and_then(|v| v.get(lesson_no.to_string()))
-        .ok_or("lesson not found in plan")?;
-
-    let path = lesson_video_path(&root, &plan, lesson)
-        .ok_or_else(|| {
-            let filename = lesson
-                .get("filename")
-                .and_then(|v| v.as_str())
-                .unwrap_or("?");
-            let subdir = lesson_video_subdir(lesson, &plan);
-            format!(
-                "视频文件不存在: {}/{filename}",
-                Path::new(&root).join(subdir).display()
-            )
-        })?;
-    Ok(path.to_string_lossy().to_string())
+fn resolve_video_path_inner(app: &AppHandle, video_id: &str) -> Result<String, String> {
+    let settings = settings_for(app)?.1;
+    let root = settings.root_dir.ok_or("请先选择资料目录")?;
+    catalog::resolve_video_path(&root, video_id).map(|p| p.to_string_lossy().to_string())
 }
 
 #[tauri::command]
-pub fn resolve_video_path(app: AppHandle, lesson_no: u32) -> Result<String, String> {
-    resolve_video_path_inner(&app, lesson_no)
+pub fn resolve_video_path(app: AppHandle, video_id: String) -> Result<String, String> {
+    resolve_video_path_inner(&app, &video_id)
 }
 
 #[tauri::command]
-pub fn open_player(app: AppHandle, lesson_no: u32) -> Result<(), String> {
-    ensure_player_window(&app, lesson_no)
+pub fn open_player(app: AppHandle, video_id: String, title: String) -> Result<(), String> {
+    resolve_video_path_inner(&app, &video_id)?;
+    crate::ensure_player_window(&app, &video_id, &title)
 }
 
 #[tauri::command]
-pub fn open_external_video(app: AppHandle, lesson_no: u32) -> Result<(), String> {
-    let path = resolve_video_path_inner(&app, lesson_no)?;
+pub fn open_external_video(app: AppHandle, video_id: String) -> Result<(), String> {
+    let path = resolve_video_path_inner(&app, &video_id)?;
     tauri_plugin_opener::OpenerExt::opener(&app)
         .open_path(path, None::<&str>)
         .map_err(|e| e.to_string())

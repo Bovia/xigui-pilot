@@ -1,3 +1,4 @@
+mod catalog;
 mod commands;
 mod progress;
 mod settings;
@@ -58,18 +59,14 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             commands::get_settings,
             commands::set_root_dir,
-            commands::set_textbook_dir,
             commands::prepare_dialog,
             commands::finish_dialog,
             commands::get_progress,
             commands::save_video_progress,
-            commands::mark_task_done,
-            commands::get_today_snapshot,
+            commands::get_catalog,
             commands::resolve_video_path,
             commands::open_player,
             commands::open_external_video,
-            commands::open_textbook,
-            commands::open_quiz,
             commands::get_panel_pinned,
             commands::set_panel_pinned,
             commands::set_woven_style,
@@ -156,11 +153,7 @@ pub fn refresh_tray_badge(app: &AppHandle) {
         let _ = tray.set_title(Some(""));
     }
     let tooltip = if badge.count > 0 {
-        if badge.today_scope {
-            format!("系规助手 · 今日还有 {} 节未看", badge.count)
-        } else {
-            format!("系规助手 · 本周还有 {} 节未看", badge.count)
-        }
+        format!("系规助手 · 还有 {} 个视频未看完", badge.count)
     } else {
         "系规助手".to_string()
     };
@@ -184,20 +177,26 @@ fn toggle_panel(app: &AppHandle) {
     let _ = window.set_focus();
 }
 
-pub fn ensure_player_window(app: &AppHandle, lesson_no: u32) -> Result<(), String> {
+pub fn ensure_player_window(app: &AppHandle, video_id: &str, title: &str) -> Result<(), String> {
+    use std::collections::hash_map::DefaultHasher;
+    use std::hash::{Hash, Hasher};
+
     activate_for_action(app);
-    let label = format!("player-{lesson_no}");
+    let mut hasher = DefaultHasher::new();
+    video_id.hash(&mut hasher);
+    let label = format!("player-{:016x}", hasher.finish());
+    let encoded_id = urlencoding::encode(video_id);
 
     if let Some(window) = app.get_webview_window(&label) {
         let _ = window.show();
         let _ = window.set_focus();
-        let _ = window.emit("player-open", lesson_no);
+        let _ = window.emit("player-open", video_id.to_string());
         return Ok(());
     }
 
-    let url = WebviewUrl::App(format!("index.html?view=player&lesson={lesson_no}").into());
+    let url = WebviewUrl::App(format!("index.html?view=player&id={encoded_id}").into());
     WebviewWindowBuilder::new(app, &label, url)
-        .title(format!("第{lesson_no}节"))
+        .title(title)
         .inner_size(480.0, 300.0)
         .min_inner_size(360.0, 220.0)
         .decorations(true)

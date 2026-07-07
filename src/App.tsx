@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { listen } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
-import TodayPanel from "./panel/TodayPanel";
+import DynamicPanel from "./panel/DynamicPanel";
 import VideoPlayer from "./player/VideoPlayer";
 
 function readView() {
@@ -9,21 +9,21 @@ function readView() {
   return params.get("view") ?? "panel";
 }
 
-function readLessonNo() {
+function readVideoId() {
   const params = new URLSearchParams(window.location.search);
-  const raw = params.get("lesson");
-  return raw ? Number(raw) : undefined;
+  const raw = params.get("id");
+  return raw ? decodeURIComponent(raw) : undefined;
 }
 
 export default function App() {
   const [view] = useState(readView);
-  const [lessonNo, setLessonNo] = useState<number | undefined>(readLessonNo);
+  const [videoId, setVideoId] = useState<string | undefined>(readVideoId);
 
   useEffect(() => {
     if (view !== "player") return;
 
-    const unlistenPromise = listen<number>("player-open", (event) => {
-      setLessonNo(event.payload);
+    const unlistenPromise = listen<string>("player-open", (event) => {
+      setVideoId(event.payload);
     });
 
     return () => {
@@ -35,9 +35,9 @@ export default function App() {
     getCurrentWindow().setDecorations(view === "player").catch(() => undefined);
   }, [view]);
 
-  if (view === "player" && lessonNo) {
-    return <VideoPlayer lessonNo={lessonNo} />;
+  if (view === "player" && videoId) {
+    return <VideoPlayer videoId={videoId} />;
   }
 
-  return <TodayPanel />;
+  return <DynamicPanel />;
 }

@@ -1,16 +1,15 @@
-import Artplayer from "artplayer";
 import { useEffect, useRef, useState } from "react";
+import Artplayer from "artplayer";
 import { convertFileSrc } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import EyeRestPrompt from "../components/EyeRestPrompt";
-import { loadPlan, resolveVideoPath, saveVideoProgress } from "../lib/api";
+import { getProgress, resolveVideoPath, saveVideoProgress } from "../lib/api";
 import { isEyeRestEnabled, useEyeRestReminder } from "../lib/eyeRest";
-import type { PlanFile, PlanLesson } from "../lib/types";
 
-export default function VideoPlayer({ lessonNo }: { lessonNo: number }) {
+export default function VideoPlayer({ videoId }: { videoId: string }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const artRef = useRef<Artplayer | null>(null);
-  const [title, setTitle] = useState(`第 ${lessonNo} 节`);
+  const [title, setTitle] = useState("播放中");
   const [error, setError] = useState<string | null>(null);
   const [playing, setPlaying] = useState(false);
   const [eyeRestEnabled] = useState(isEyeRestEnabled);
@@ -27,24 +26,19 @@ export default function VideoPlayer({ lessonNo }: { lessonNo: number }) {
       if (!containerRef.current) return;
 
       try {
-        const [plan, path] = await Promise.all([
-          loadPlan() as Promise<PlanFile>,
-          resolveVideoPath(lessonNo),
-        ]);
+        const path = await resolveVideoPath(videoId);
+        const displayTitle = decodeDisplayTitle(videoId);
+        setTitle(displayTitle);
+        getCurrentWindow().setTitle(displayTitle).catch(() => undefined);
 
-        const lesson: PlanLesson | undefined = plan.lessons[String(lessonNo)];
-        if (lesson?.title) {
-          setTitle(lesson.title);
-          getCurrentWindow().setTitle(lesson.title).catch(() => undefined);
-        }
-
-        if (lesson && !lesson.builtinPlayable) {
+        if (!videoId.toLowerCase().endsWith(".mp4")) {
           setError("该视频格式需用系统播放器打开（如 mkv）");
           return;
         }
 
         const url = convertFileSrc(path);
-        const saved = await fetchProgress(lessonNo);
+        const progress = await getProgress();
+        const saved = progress.videos[videoId];
 
         if (disposed || !containerRef.current) return;
 
@@ -80,7 +74,7 @@ export default function VideoPlayer({ lessonNo }: { lessonNo: number }) {
           if (!art) return;
 
           if (enabled) {
-            saveVideoProgress(lessonNo, art.currentTime, art.duration || 0).catch(
+            saveVideoProgress(videoId, art.currentTime, art.duration || 0).catch(
               () => undefined,
             );
             win.hide().catch(() => undefined);
@@ -96,7 +90,7 @@ export default function VideoPlayer({ lessonNo }: { lessonNo: number }) {
           if (!art) return;
           window.clearTimeout(saveTimer);
           saveTimer = window.setTimeout(() => {
-            saveVideoProgress(lessonNo, art.currentTime, art.duration || 0).catch(
+            saveVideoProgress(videoId, art.currentTime, art.duration || 0).catch(
               () => undefined,
             );
           }, 3000);
@@ -105,7 +99,7 @@ export default function VideoPlayer({ lessonNo }: { lessonNo: number }) {
         artRef.current.on("pause", () => {
           const art = artRef.current;
           if (!art) return;
-          saveVideoProgress(lessonNo, art.currentTime, art.duration || 0).catch(
+          saveVideoProgress(videoId, art.currentTime, art.duration || 0).catch(
             () => undefined,
           );
         });
@@ -122,7 +116,7 @@ export default function VideoPlayer({ lessonNo }: { lessonNo: number }) {
       artRef.current?.destroy();
       artRef.current = null;
     };
-  }, [lessonNo]);
+  }, [videoId]);
 
   useEffect(() => {
     if (phase !== "prompt" || !artRef.current) return;
@@ -159,14 +153,9 @@ export default function VideoPlayer({ lessonNo }: { lessonNo: number }) {
   );
 }
 
-async function fetchProgress(lessonNo: number) {
-  try {
-    const { invoke } = await import("@tauri-apps/api/core");
-    const progress = await invoke<{ videos: Record<string, { position: number }> }>(
-      "get_progress",
-    );
-    return progress.videos[String(lessonNo)];
-  } catch {
-    return undefined;
-  }
+function decodeDisplayTitle(videoId: string) {
+  const filename = videoId.split("/").pop() ?? videoId;
+  const stem = filename.replace(/\.[^.]+$/, "");
+  const stripped = stem.replace(/^\[\d+\]-*/, "").trim();
+  return stripped || filename;
 }
