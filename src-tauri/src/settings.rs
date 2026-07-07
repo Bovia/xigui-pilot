@@ -14,6 +14,8 @@ pub struct Settings {
     pub woven_style: Option<bool>,
     #[serde(default)]
     pub plan_variant: Option<String>,
+    #[serde(default)]
+    pub floating_subtitles: Option<bool>,
 }
 
 impl Default for Settings {
@@ -24,6 +26,7 @@ impl Default for Settings {
             panel_pinned: Some(true),
             woven_style: Some(false),
             plan_variant: Some("v2".into()),
+            floating_subtitles: Some(true),
         }
     }
 }
@@ -31,6 +34,10 @@ impl Default for Settings {
 impl Settings {
     pub fn panel_pinned(&self) -> bool {
         self.panel_pinned.unwrap_or(true)
+    }
+
+    pub fn floating_subtitles(&self) -> bool {
+        self.floating_subtitles.unwrap_or(true)
     }
 
     pub fn plan_variant(&self) -> &str {

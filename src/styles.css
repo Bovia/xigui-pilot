@@ -16,6 +16,12 @@ html.panel-view #root {
   background: transparent;
 }
 
+html.subtitle-view,
+html.subtitle-view body,
+html.subtitle-view #root {
+  background: transparent;
+}
+
 body {
   font-family:
     -apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang SC", sans-serif;
@@ -37,6 +43,45 @@ button {
 
 .player-shell {
   background: #0f172a;
+}
+
+.subtitle-overlay-shell {
+  background: transparent;
+}
+
+.subtitle-bar {
+  border-radius: 0.75rem;
+  background: rgba(15, 23, 42, 0.82);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow:
+    0 12px 32px rgba(0, 0, 0, 0.35),
+    0 2px 8px rgba(0, 0, 0, 0.2);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  padding: 0.65rem 1rem 0.75rem;
+  text-align: center;
+}
+
+.subtitle-current {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 600;
+  line-height: 1.45;
+  color: #f8fafc;
+  letter-spacing: 0.01em;
+}
+
+.subtitle-next {
+  margin: 0.25rem 0 0;
+  font-size: 0.75rem;
+  line-height: 1.35;
+  color: rgba(248, 250, 252, 0.55);
+}
+
+.subtitle-placeholder {
+  margin: 0;
+  font-size: 0.85rem;
+  color: rgba(248, 250, 252, 0.45);
 }
 
 .artplayer-app {
@@ -296,8 +341,17 @@ button {
     0 8px 24px var(--woven-shadow);
 }
 
+.panel-shell.theme-woven .settings-menu {
+  -webkit-font-smoothing: antialiased;
+}
+
 .panel-shell.theme-woven .settings-menu button {
+  color: var(--woven-ink);
   transition: background-color 200ms ease;
+}
+
+.settings-menu button {
+  -webkit-font-smoothing: antialiased;
 }
 
 .panel-shell.theme-woven .border-slate-100,

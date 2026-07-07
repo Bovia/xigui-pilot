@@ -76,6 +76,10 @@ pub fn run() {
             commands::set_panel_pinned,
             commands::set_woven_style,
             commands::set_plan_variant,
+            commands::set_floating_subtitles,
+            commands::resolve_subtitle_path,
+            commands::open_subtitle_window,
+            commands::close_subtitle_window_cmd,
             commands::quit_app,
         ])
         .build(tauri::generate_context!())
@@ -97,6 +101,19 @@ pub fn run() {
                         if let Some(window) = app.get_webview_window("panel") {
                             let _ = window.hide();
                             restore_accessory(&app);
+                        }
+                    }
+                }
+                RunEvent::WindowEvent { label, event, .. } if label.starts_with("player-") => {
+                    if matches!(
+                        event,
+                        tauri::WindowEvent::CloseRequested { .. }
+                            | tauri::WindowEvent::Destroyed
+                    ) {
+                        if let Some(suffix) = label.strip_prefix("player-") {
+                            if let Ok(lesson_no) = suffix.parse::<u32>() {
+                                close_subtitle_window(&app, lesson_no);
+                            }
                         }
                     }
                 }
@@ -206,6 +223,38 @@ pub fn ensure_player_window(app: &AppHandle, lesson_no: u32) -> Result<(), Strin
         .decorations(true)
         .always_on_top(true)
         .resizable(true)
+        .build()
+        .map_err(|e| e.to_string())?;
+
+    Ok(())
+}
+
+pub fn close_subtitle_window(app: &AppHandle, lesson_no: u32) {
+    let label = format!("subtitle-{lesson_no}");
+    if let Some(window) = app.get_webview_window(&label) {
+        let _ = window.close();
+    }
+}
+
+pub fn ensure_subtitle_window(app: &AppHandle, lesson_no: u32) -> Result<(), String> {
+    let label = format!("subtitle-{lesson_no}");
+
+    if let Some(window) = app.get_webview_window(&label) {
+        let _ = window.show();
+        let _ = window.emit("subtitle-open", lesson_no);
+        return Ok(());
+    }
+
+    let url = WebviewUrl::App(format!("index.html?view=subtitle&lesson={lesson_no}").into());
+    WebviewWindowBuilder::new(app, &label, url)
+        .title("字幕")
+        .inner_size(640.0, 88.0)
+        .min_inner_size(320.0, 64.0)
+        .decorations(false)
+        .transparent(true)
+        .always_on_top(true)
+        .resizable(false)
+        .skip_taskbar(true)
         .build()
         .map_err(|e| e.to_string())?;
 

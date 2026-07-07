@@ -17,6 +17,7 @@ import {
   pickTextbook,
   quitApp,
   setPanelPinned,
+  setFloatingSubtitles,
   setWovenStyle,
 } from "../lib/api";
 import type { CatalogLesson, PlanFile, TextbookFile, TodaySnapshot } from "../lib/types";
@@ -407,6 +408,7 @@ export default function TodayPanel() {
   const [quizName, setQuizName] = useState("郑房新一点通");
   const [pinned, setPinned] = useState(true);
   const [wovenStyle, setWovenStyleOn] = useState(false);
+  const [floatingSubtitles, setFloatingSubtitlesOn] = useState(true);
   const [guideOpen, setGuideOpen] = useState(false);
   const [planOpen, setPlanOpen] = useState(false);
   const [expandedSections, setExpandedSections] = useState(loadExpandedSections);
@@ -479,6 +481,7 @@ export default function TodayPanel() {
     getSettings()
       .then((s) => {
         setWovenStyleOn(s.wovenStyle ?? false);
+        setFloatingSubtitlesOn(s.floatingSubtitles ?? true);
       })
       .catch(() => undefined);
   }, [refresh]);
@@ -564,6 +567,16 @@ export default function TodayPanel() {
     try {
       await setWovenStyle(next);
       setWovenStyleOn(next);
+    } catch (e) {
+      setError(String(e));
+    }
+  };
+
+  const toggleFloatingSubtitles = async () => {
+    const next = !floatingSubtitles;
+    try {
+      await setFloatingSubtitles(next);
+      setFloatingSubtitlesOn(next);
     } catch (e) {
       setError(String(e));
     }
@@ -670,7 +683,7 @@ export default function TodayPanel() {
                   onClick={handlePickRoot}
                   className="w-full px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 disabled:opacity-50"
                 >
-                  {picking ? "选择中…" : "资料目录…"}
+                  {picking ? "选择中" : "选择资料目录"}
                 </button>
                 <button
                   type="button"
@@ -678,7 +691,7 @@ export default function TodayPanel() {
                   onClick={handlePickTextbook}
                   className="w-full px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 disabled:opacity-50"
                 >
-                  {pickingTextbook ? "选择中…" : "教材 PDF…"}
+                  {pickingTextbook ? "选择中" : "选择教材 PDF"}
                 </button>
                 <button
                   type="button"
@@ -690,6 +703,13 @@ export default function TodayPanel() {
                   className="w-full px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50"
                 >
                   {eyeRestOn ? "✓ 护眼（看视频时）" : "护眼（看视频时）"}
+                </button>
+                <button
+                  type="button"
+                  onClick={toggleFloatingSubtitles}
+                  className="w-full px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50"
+                >
+                  {floatingSubtitles ? "✓ 桌面悬浮字幕" : "桌面悬浮字幕"}
                 </button>
                 <button
                   type="button"
@@ -753,7 +773,7 @@ export default function TodayPanel() {
               onClick={handlePickRoot}
               className="w-full rounded-xl border border-dashed border-slate-300 py-3 text-sm text-slate-600 hover:border-blue-300 hover:text-blue-600 disabled:opacity-60"
             >
-              {picking ? "选择中…" : "选择资料目录（Desktop/系规）"}
+              {picking ? "选择中" : "选择资料目录（Desktop/系规）"}
             </button>
           </div>
         )}

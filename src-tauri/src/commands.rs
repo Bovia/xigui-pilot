@@ -1,6 +1,6 @@
 use crate::progress::{progress_path, ProgressStore, VideoProgress};
 use crate::settings::{settings_path, Settings};
-use crate::{activate_for_action, ensure_player_window, restore_accessory, set_panel_hide_suppressed};
+use crate::{activate_for_action, close_subtitle_window, ensure_player_window, ensure_subtitle_window, restore_accessory, set_panel_hide_suppressed};
 use chrono::{Local, NaiveDate};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -801,6 +801,83 @@ fn resolve_video_path_inner(app: &AppHandle, lesson_no: u32) -> Result<String, S
 #[tauri::command]
 pub fn resolve_video_path(app: AppHandle, lesson_no: u32) -> Result<String, String> {
     resolve_video_path_inner(&app, lesson_no)
+}
+
+#[derive(Debug, Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct SubtitleInfo {
+    pub path: String,
+    pub format: String,
+}
+
+fn find_subtitle_path(video_path: &Path) -> Option<(PathBuf, &'static str)> {
+    let stem = video_path.file_stem()?.to_str()?;
+    let dir = video_path.parent()?;
+    for ext in ["srt", "vtt"] {
+        let candidate = dir.join(format!("{stem}.{ext}"));
+        if candidate.is_file() {
+            return Some((candidate, ext));
+        }
+    }
+    None
+}
+
+fn resolve_subtitle_path_inner(app: &AppHandle, lesson_no: u32) -> Result<Option<SubtitleInfo>, String> {
+    let video_path = match resolve_video_path_inner(app, lesson_no) {
+        Ok(path) => path,
+        Err(_) => return Ok(None),
+    };
+    let Some((path, format)) = find_subtitle_path(Path::new(&video_path)) else {
+        return Ok(None);
+    };
+    Ok(Some(SubtitleInfo {
+        path: path.to_string_lossy().to_string(),
+        format: format.to_string(),
+    }))
+}
+
+#[tauri::command]
+pub fn resolve_subtitle_path(app: AppHandle, lesson_no: u32) -> Result<Option<SubtitleInfo>, String> {
+    resolve_subtitle_path_inner(&app, lesson_no)
+}
+
+#[tauri::command]
+pub fn open_subtitle_window(app: AppHandle, lesson_no: u32) -> Result<(), String> {
+    let (_, settings) = settings_for(&app)?;
+    if !settings.floating_subtitles() {
+        return Ok(());
+    }
+    if resolve_subtitle_path_inner(&app, lesson_no)?.is_none() {
+        return Ok(());
+    }
+    ensure_subtitle_window(&app, lesson_no)
+}
+
+#[tauri::command]
+pub fn close_subtitle_window_cmd(app: AppHandle, lesson_no: u32) -> Result<(), String> {
+    close_subtitle_window(&app, lesson_no);
+    Ok(())
+}
+
+#[tauri::command]
+pub fn set_floating_subtitles(app: AppHandle, enabled: bool) -> Result<Settings, String> {
+    let (path, mut settings) = settings_for(&app)?;
+    settings.floating_subtitles = Some(enabled);
+    settings.save(&path)?;
+    if !enabled {
+        let windows: Vec<String> = app
+            .webview_windows()
+            .keys()
+            .filter(|label| label.starts_with("subtitle-"))
+            .cloned()
+            .collect();
+        for label in windows {
+            if let Some(window) = app.get_webview_window(&label) {
+                let _ = window.close();
+            }
+        }
+    }
+    Ok(settings)
 }
 
 #[tauri::command]

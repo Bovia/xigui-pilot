@@ -2,7 +2,7 @@
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
   "description": "Default capabilities",
-  "windows": ["panel", "player-*"],
+  "windows": ["panel", "player-*", "subtitle-*"],
   "permissions": [
     "core:default",
     "core:path:default",

@@ -38,6 +38,7 @@ export interface Settings {
   panelPinned?: boolean | null;
   wovenStyle?: boolean | null;
   planVariant?: string | null;
+  floatingSubtitles?: boolean | null;
 }
 
 export interface PlanLesson {

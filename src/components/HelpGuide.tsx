@@ -85,6 +85,29 @@ export default function HelpGuide({ open, quizName, onClose }: Props) {
           </section>
 
           <section>
+            <div className="mb-1 font-medium text-slate-800">桌面悬浮字幕</div>
+            <p>
+              开启后，播放时会查找与视频<strong>同目录、同名</strong>的{" "}
+              <code className="text-[11px]">.srt</code> 或{" "}
+              <code className="text-[11px]">.vtt</code> 文件。例如视频为{" "}
+              <code className="text-[11px]">[01]--导学.mp4</code>，字幕应为{" "}
+              <code className="text-[11px]">[01]--导学.srt</code>。字幕条可拖到桌面任意位置。
+            </p>
+          </section>
+
+          <section>
+            <div className="mb-1 font-medium text-slate-800">开发调试（改界面不用每次打包）</div>
+            <p>
+              在终端运行 <code className="text-[11px]">pnpm dev:app</code>{" "}
+              启动带热更新的开发版，改 <code className="text-[11px]">src/</code>{" "}
+              保存即可刷新。只有改 Rust 后端才需重启。日常用再执行打包脚本。
+            </p>
+            <p className="mt-1 font-mono text-[11px] text-slate-500">
+              cd ~/Projects/xigui-pilot && pnpm dev:app
+            </p>
+          </section>
+
+          <section>
             <div className="mb-1 font-medium text-slate-800">更新 App</div>
             <p className="font-mono text-[11px] text-slate-500">
               cd ~/Projects/xigui-pilot && ./scripts/update-desktop-app.sh

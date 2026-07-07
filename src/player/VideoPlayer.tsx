@@ -1,9 +1,18 @@
 import Artplayer from "artplayer";
 import { useEffect, useRef, useState } from "react";
 import { convertFileSrc } from "@tauri-apps/api/core";
+import { emit } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import EyeRestPrompt from "../components/EyeRestPrompt";
-import { loadPlan, resolveVideoPath, saveVideoProgress } from "../lib/api";
+import {
+  closeSubtitleWindow,
+  getSettings,
+  loadPlan,
+  openSubtitleWindow,
+  resolveSubtitlePath,
+  resolveVideoPath,
+  saveVideoProgress,
+} from "../lib/api";
 import { isEyeRestEnabled, useEyeRestReminder } from "../lib/eyeRest";
 import type { PlanFile, PlanLesson } from "../lib/types";
 
@@ -11,6 +20,7 @@ export default function VideoPlayer({ lessonNo }: { lessonNo: number }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const artRef = useRef<Artplayer | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [subtitleHint, setSubtitleHint] = useState<string | null>(null);
   const [playing, setPlaying] = useState(false);
   const [eyeRestEnabled] = useState(isEyeRestEnabled);
   const { phase, restLeft, startRest, snooze, dismissPrompt } = useEyeRestReminder(
@@ -64,9 +74,15 @@ export default function VideoPlayer({ lessonNo }: { lessonNo: number }) {
         });
 
         artRef.current.on("ready", () => {
-          if (saved?.position && artRef.current) {
-            artRef.current.seek = saved.position;
+          const art = artRef.current;
+          if (!art) return;
+          if (saved?.position) {
+            art.seek = saved.position;
           }
+          emit("player-timeupdate", {
+            lessonNo,
+            currentTime: art.currentTime,
+          }).catch(() => undefined);
         });
 
         artRef.current.on("play", () => setPlaying(true));
@@ -94,6 +110,10 @@ export default function VideoPlayer({ lessonNo }: { lessonNo: number }) {
         artRef.current.on("video:timeupdate", () => {
           const art = artRef.current;
           if (!art) return;
+          emit("player-timeupdate", {
+            lessonNo,
+            currentTime: art.currentTime,
+          }).catch(() => undefined);
           window.clearTimeout(saveTimer);
           saveTimer = window.setTimeout(() => {
             saveVideoProgress(lessonNo, art.currentTime, art.duration || 0).catch(
@@ -101,6 +121,18 @@ export default function VideoPlayer({ lessonNo }: { lessonNo: number }) {
             );
           }, 3000);
         });
+
+        const settings = await getSettings().catch(() => null);
+        if (settings?.floatingSubtitles !== false) {
+          const subtitle = await resolveSubtitlePath(lessonNo).catch(() => null);
+          if (subtitle) {
+            await openSubtitleWindow(lessonNo).catch(() => undefined);
+          } else {
+            setSubtitleHint(
+              "未找到字幕文件：在与视频同目录放置同名 .srt 或 .vtt 后重新播放",
+            );
+          }
+        }
 
         artRef.current.on("pause", () => {
           const art = artRef.current;
@@ -119,6 +151,7 @@ export default function VideoPlayer({ lessonNo }: { lessonNo: number }) {
     return () => {
       disposed = true;
       window.clearTimeout(saveTimer);
+      closeSubtitleWindow(lessonNo).catch(() => undefined);
       artRef.current?.destroy();
       artRef.current = null;
     };
@@ -138,6 +171,20 @@ export default function VideoPlayer({ lessonNo }: { lessonNo: number }) {
         </div>
       ) : (
         <div ref={containerRef} className="artplayer-app relative h-full" />
+      )}
+      {subtitleHint && (
+        <div className="absolute inset-x-0 bottom-14 z-40 px-3">
+          <p className="rounded-lg bg-slate-900/85 px-3 py-2 text-center text-xs leading-5 text-slate-200">
+            {subtitleHint}
+            <button
+              type="button"
+              onClick={() => setSubtitleHint(null)}
+              className="ml-2 text-slate-400 hover:text-white"
+            >
+              知道了
+            </button>
+          </p>
+        </div>
       )}
       {eyeRestEnabled && phase !== "idle" && (
         <EyeRestPrompt

@@ -155,6 +155,20 @@ export async function loadPlan(variant?: PlanVariant) {
 export const setPlanVariant = (variant: PlanVariant) =>
   invoke<Settings>("set_plan_variant", { variant });
 
+export const resolveSubtitlePath = (lessonNo: number) =>
+  invoke<{ path: string; format: "srt" | "vtt" } | null>("resolve_subtitle_path", {
+    lessonNo,
+  });
+
+export const openSubtitleWindow = (lessonNo: number) =>
+  invoke<void>("open_subtitle_window", { lessonNo });
+
+export const closeSubtitleWindow = (lessonNo: number) =>
+  invoke<void>("close_subtitle_window_cmd", { lessonNo });
+
+export const setFloatingSubtitles = (enabled: boolean) =>
+  invoke<Settings>("set_floating_subtitles", { enabled });
+
 export const openPlanSpreadsheet = (variant: PlanVariant) =>
   invoke<void>("open_plan_spreadsheet", { variant });
 

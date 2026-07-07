@@ -10,7 +10,8 @@
     "preview": "vite preview",
     "tauri": "tauri",
     "gen:plan": "python3 scripts/generate_plan.py",
-    "gen:plan-v2": "python3 scripts/generate_plan_workbooks.py"
+    "gen:plan-v2": "python3 scripts/generate_plan_workbooks.py",
+    "gen:subtitle": "python3 scripts/generate_subtitle.py"
   },
   "dependencies": {
     "@tauri-apps/api": "^2.11.1",
