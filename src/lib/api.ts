@@ -1,7 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { homeDir } from "@tauri-apps/api/path";
 import { open } from "@tauri-apps/plugin-dialog";
-import type { Settings, TodaySnapshot } from "./types";
+import type { PlanVariant, Settings, TodaySnapshot } from "./types";
 
 export const getTodaySnapshot = () =>
   invoke<TodaySnapshot>("get_today_snapshot");
@@ -91,6 +91,17 @@ export const getProgress = () =>
     >;
   }>("get_progress");
 
+export const getLiveCatalog = () =>
+  invoke<
+    Array<{
+      no: number;
+      title: string;
+      filename: string;
+      category: string;
+      missing: boolean;
+    }>
+  >("get_live_catalog");
+
 export const openPlayer = (lessonNo: number) =>
   invoke<void>("open_player", { lessonNo });
 
@@ -123,10 +134,29 @@ export const markTaskDone = (taskId: string, done: boolean) =>
 
 export const quitApp = () => invoke<void>("quit_app");
 
-export async function loadPlan() {
-  const res = await fetch("/plan.json");
+export async function loadPlan(variant?: PlanVariant) {
+  let v = variant;
+  if (!v) {
+    try {
+      const settings = await getSettings();
+      v = settings.planVariant === "default" ? "v2" : settings.planVariant === "v2" ? "v2" : "v2";
+    } catch {
+      v = "v2";
+    }
+  }
+  const file = v === "v2" ? "/plan-v2.json" : "/plan.json";
+  const res = await fetch(file);
+  if (!res.ok) {
+    throw new Error(`无法加载计划表：${file}`);
+  }
   return res.json();
 }
+
+export const setPlanVariant = (variant: PlanVariant) =>
+  invoke<Settings>("set_plan_variant", { variant });
+
+export const openPlanSpreadsheet = (variant: PlanVariant) =>
+  invoke<void>("open_plan_spreadsheet", { variant });
 
 export async function loadTextbook() {
   const res = await fetch("/textbook.json");

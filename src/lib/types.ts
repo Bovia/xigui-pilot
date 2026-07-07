@@ -28,6 +28,8 @@ export interface TodaySnapshot {
   weekLessonNos: number[];
   tasks: TodayTask[];
   todayPending: number;
+  planVariant?: string;
+  planName?: string;
 }
 
 export interface Settings {
@@ -35,6 +37,7 @@ export interface Settings {
   textbookDir?: string | null;
   panelPinned?: boolean | null;
   wovenStyle?: boolean | null;
+  planVariant?: string | null;
 }
 
 export interface PlanLesson {
@@ -65,11 +68,20 @@ export interface TextbookFile {
   lessons: Record<string, { page: number }>;
 }
 
+export interface PlanMilestone {
+  id: string;
+  title: string;
+  start: string;
+  end: string;
+  note?: string;
+}
+
 export interface PlanWeek {
   id: string;
   stage: string;
   phase: string;
   focus: string;
+  caseArrangement?: string;
   start: string;
   end: string;
   tasks?: Array<{
@@ -83,8 +95,16 @@ export interface PlanWeek {
 }
 
 export interface PlanFile {
+  planId?: string;
+  planName?: string;
   examDate?: string;
   startDate?: string;
+  milestones?: PlanMilestone[];
   weeks?: PlanWeek[];
   lessons: Record<string, PlanLesson>;
 }
+
+export type PlanVariant = "default" | "v2";
+
+/** 计划表弹窗内的视图（不影响后端 plan.json 选择，后端固定 v2） */
+export type PlanSheetView = "overview" | "weekDaily";

@@ -12,6 +12,8 @@ pub struct Settings {
     pub panel_pinned: Option<bool>,
     #[serde(default)]
     pub woven_style: Option<bool>,
+    #[serde(default)]
+    pub plan_variant: Option<String>,
 }
 
 impl Default for Settings {
@@ -21,6 +23,7 @@ impl Default for Settings {
             textbook_dir: None,
             panel_pinned: Some(true),
             woven_style: Some(false),
+            plan_variant: Some("v2".into()),
         }
     }
 }
@@ -28,6 +31,13 @@ impl Default for Settings {
 impl Settings {
     pub fn panel_pinned(&self) -> bool {
         self.panel_pinned.unwrap_or(true)
+    }
+
+    pub fn plan_variant(&self) -> &str {
+    match self.plan_variant.as_deref() {
+        Some("v2") | Some("default") => "v2",
+        _ => "v2",
+    }
     }
     pub fn load(path: &Path) -> Self {
         fs::read_to_string(path)

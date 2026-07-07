@@ -323,3 +323,61 @@ button {
   background-color: rgba(244, 236, 224, 0.9);
   color: var(--woven-accent);
 }
+
+/* ── 学习计划表（织物质感下与目录对齐）── */
+.panel-shell.theme-woven .study-plan-backdrop {
+  background: rgba(61, 54, 48, 0.28);
+}
+
+.panel-shell.theme-woven .study-plan-sheet {
+  background-color: rgba(250, 247, 242, 0.98);
+  border-color: #d4c9b8;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.65),
+    0 12px 32px var(--woven-shadow);
+}
+
+.panel-shell.theme-woven .study-plan-tool-btn {
+  border-color: #d4c9b8;
+  background-color: rgba(255, 252, 247, 0.92);
+  color: var(--woven-muted);
+}
+
+.panel-shell.theme-woven .study-plan-tool-btn:hover {
+  background-color: rgba(255, 252, 247, 1);
+  box-shadow: 0 2px 6px var(--woven-shadow);
+}
+
+.panel-shell.theme-woven .study-plan-menu {
+  background-color: rgba(250, 247, 242, 0.98);
+  border-color: #d4c9b8;
+  box-shadow: 0 8px 24px var(--woven-shadow);
+}
+
+.panel-shell.theme-woven .study-plan-week-card {
+  background-color: rgba(250, 247, 242, 0.88);
+  border-color: #d4c9b8;
+}
+
+.panel-shell.theme-woven .study-plan-week-card.border-blue-300 {
+  border-color: var(--woven-accent-soft);
+  background-color: rgba(244, 236, 224, 0.95);
+}
+
+.panel-shell.theme-woven .plan-table-modal,
+.panel-shell.theme-woven .plan-html-table {
+  border-color: #d4c9b8;
+}
+
+.panel-shell.theme-woven .plan-html-table thead tr {
+  background-color: rgba(244, 236, 224, 0.85);
+  color: var(--woven-muted);
+}
+
+.panel-shell.theme-woven .plan-html-table tbody tr {
+  border-color: #e8dfd0;
+}
+
+.panel-shell.theme-woven .plan-html-table tbody tr.bg-blue-50\/50 {
+  background-color: rgba(244, 236, 224, 0.95);
+}

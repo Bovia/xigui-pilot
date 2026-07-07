@@ -10,7 +10,6 @@ import type { PlanFile, PlanLesson } from "../lib/types";
 export default function VideoPlayer({ lessonNo }: { lessonNo: number }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const artRef = useRef<Artplayer | null>(null);
-  const [title, setTitle] = useState(`第 ${lessonNo} 节`);
   const [error, setError] = useState<string | null>(null);
   const [playing, setPlaying] = useState(false);
   const [eyeRestEnabled] = useState(isEyeRestEnabled);
@@ -34,8 +33,9 @@ export default function VideoPlayer({ lessonNo }: { lessonNo: number }) {
 
         const lesson: PlanLesson | undefined = plan.lessons[String(lessonNo)];
         if (lesson?.title) {
-          setTitle(lesson.title);
           getCurrentWindow().setTitle(lesson.title).catch(() => undefined);
+        } else {
+          getCurrentWindow().setTitle(`第 ${lessonNo} 节`).catch(() => undefined);
         }
 
         if (lesson && !lesson.builtinPlayable) {
@@ -131,19 +131,13 @@ export default function VideoPlayer({ lessonNo }: { lessonNo: number }) {
   }, [phase]);
 
   return (
-    <div className="player-shell relative flex h-full flex-col">
-      <div className="border-b border-slate-800 px-3 py-2 text-sm text-slate-200">
-        {title}
-        {eyeRestEnabled && playing && phase === "idle" && (
-          <span className="ml-2 text-[10px] text-slate-500">护眼提醒已开启</span>
-        )}
-      </div>
+    <div className="player-shell relative h-full">
       {error ? (
-        <div className="flex flex-1 items-center justify-center p-4 text-sm text-rose-300">
+        <div className="flex h-full items-center justify-center p-4 text-sm text-rose-300">
           {error}
         </div>
       ) : (
-        <div ref={containerRef} className="artplayer-app relative flex-1" />
+        <div ref={containerRef} className="artplayer-app relative h-full" />
       )}
       {eyeRestEnabled && phase !== "idle" && (
         <EyeRestPrompt

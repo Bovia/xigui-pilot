@@ -43,6 +43,8 @@ pub struct TodaySnapshot {
     pub week_lesson_nos: Vec<u32>,
     pub tasks: Vec<TodayTask>,
     pub today_pending: u32,
+    pub plan_variant: String,
+    pub plan_name: String,
 }
 
 fn video_subdir_from_plan(plan: &Value) -> String {
@@ -113,6 +115,83 @@ fn resolve_video_dir(root: &str, video_subdir: &str) -> PathBuf {
     nested
 }
 
+const LIVE_SUBDIR: &str = "03：直播课（陆续更新上传）";
+const LIVE_NO_START: u32 = 701;
+const LIVE_NO_MAX: u32 = 50;
+
+fn is_playable_video(name: &str) -> bool {
+    (name.ends_with(".mp4") || name.ends_with(".mkv"))
+        && !name.ends_with(".downloading")
+        && !name.contains(".baiduyun.p.downloading")
+}
+
+fn live_title_from_filename(filename: &str) -> String {
+    let stem = filename
+        .trim_end_matches(".mp4")
+        .trim_end_matches(".mkv");
+    if let Some(idx) = stem.find("--") {
+        return stem[idx + 2..].to_string();
+    }
+    if let Some(idx) = stem.find(']') {
+        return stem[idx + 1..]
+            .trim_start_matches('-')
+            .trim_start_matches('_')
+            .to_string();
+    }
+    stem.to_string()
+}
+
+#[derive(Debug, Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct LiveCatalogLesson {
+    pub no: u32,
+    pub title: String,
+    pub filename: String,
+    pub category: String,
+    pub missing: bool,
+}
+
+fn scan_live_lessons(root: &str) -> Vec<LiveCatalogLesson> {
+    let dir = resolve_video_dir(root, LIVE_SUBDIR);
+    if !dir.is_dir() {
+        return Vec::new();
+    }
+    let mut files: Vec<String> = fs::read_dir(&dir)
+        .ok()
+        .into_iter()
+        .flatten()
+        .filter_map(|e| e.ok())
+        .map(|e| e.file_name().to_string_lossy().to_string())
+        .filter(|name| is_playable_video(name))
+        .collect();
+    files.sort_by(|a, b| a.to_lowercase().cmp(&b.to_lowercase()));
+
+    files
+        .into_iter()
+        .enumerate()
+        .take(LIVE_NO_MAX as usize)
+        .map(|(i, filename)| {
+            let no = LIVE_NO_START + i as u32;
+            let path = dir.join(&filename);
+            LiveCatalogLesson {
+                no,
+                title: live_title_from_filename(&filename),
+                filename,
+                category: "live".into(),
+                missing: !path.is_file(),
+            }
+        })
+        .collect()
+}
+
+fn resolve_live_video_path(root: &str, lesson_no: u32) -> Option<PathBuf> {
+    scan_live_lessons(root)
+        .into_iter()
+        .find(|l| l.no == lesson_no)
+        .map(|l| resolve_video_dir(root, LIVE_SUBDIR).join(l.filename))
+        .filter(|p| p.is_file())
+}
+
 fn count_videos(root: &str, plan: &Value) -> (u32, u32) {
     let Some(lessons) = plan.get("lessons").and_then(|v| v.as_object()) else {
         return (0, 0);
@@ -148,13 +227,20 @@ fn ensure_normalized_settings(app: &AppHandle, plan: &Value) -> Result<Settings,
     Ok(settings)
 }
 
-fn load_plan() -> Result<Value, String> {
-    let resource = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../public/plan.json");
+fn load_plan_for(app: &AppHandle) -> Result<Value, String> {
+    let settings = settings_for(app)?.1;
+    let file = match settings.plan_variant() {
+        "v2" => "plan-v2.json",
+        _ => "plan.json",
+    };
+    let resource = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../public")
+        .join(file);
     if resource.exists() {
         let raw = fs::read_to_string(resource).map_err(|e| e.to_string())?;
         return serde_json::from_str(&raw).map_err(|e| e.to_string());
     }
-    Err("plan.json not found".into())
+    Err(format!("{file} not found"))
 }
 
 fn parse_date(s: &str) -> Option<NaiveDate> {
@@ -256,7 +342,7 @@ fn count_unwatched_in_tasks(tasks: &[Value], progress: &ProgressStore) -> u32 {
 }
 
 pub(crate) fn count_current_week_unwatched(app: &AppHandle) -> Result<u32, String> {
-    let plan = load_plan()?;
+    let plan = load_plan_for(&app)?;
     let (_, progress) = progress_for(app)?;
     let week = current_week_plan(&plan);
     let tasks = week
@@ -268,7 +354,7 @@ pub(crate) fn count_current_week_unwatched(app: &AppHandle) -> Result<u32, Strin
 }
 
 pub(crate) fn tray_badge_count(app: &AppHandle) -> Result<TrayBadge, String> {
-    let plan = load_plan()?;
+    let plan = load_plan_for(&app)?;
     let today_count = count_today_unwatched(app)?;
     if has_today_video_tasks(&plan) {
         return Ok(TrayBadge {
@@ -282,7 +368,7 @@ pub(crate) fn tray_badge_count(app: &AppHandle) -> Result<TrayBadge, String> {
     })
 }
 pub(crate) fn count_today_unwatched(app: &AppHandle) -> Result<u32, String> {
-    let plan = load_plan()?;
+    let plan = load_plan_for(&app)?;
     let today = today_string();
     let (_, progress) = progress_for(app)?;
 
@@ -340,7 +426,7 @@ pub fn get_settings(app: AppHandle) -> Result<Settings, String> {
 
 #[tauri::command]
 pub fn set_root_dir(app: AppHandle, root_dir: String) -> Result<Settings, String> {
-    let plan = load_plan()?;
+    let plan = load_plan_for(&app)?;
     let (path, mut settings) = settings_for(&app)?;
     let video_subdir = video_subdir_from_plan(&plan);
     settings.root_dir = Some(normalize_material_root(&root_dir, &video_subdir));
@@ -447,6 +533,19 @@ pub fn set_woven_style(app: AppHandle, enabled: bool) -> Result<Settings, String
 }
 
 #[tauri::command]
+pub fn set_plan_variant(app: AppHandle, variant: String) -> Result<Settings, String> {
+    let (path, mut settings) = settings_for(&app)?;
+    settings.plan_variant = Some(if variant == "v2" {
+        "v2".into()
+    } else {
+        "default".into()
+    });
+    settings.save(&path)?;
+    crate::refresh_tray_badge(&app);
+    Ok(settings)
+}
+
+#[tauri::command]
 pub fn get_progress(app: AppHandle) -> Result<ProgressStore, String> {
     let (_, progress) = progress_for(&app)?;
     Ok(progress)
@@ -486,7 +585,7 @@ pub fn mark_task_done(app: AppHandle, task_id: String, done: bool) -> Result<(),
 
 #[tauri::command]
 pub fn get_today_snapshot(app: AppHandle) -> Result<TodaySnapshot, String> {
-    let plan = load_plan()?;
+    let plan = load_plan_for(&app)?;
     let today = today_string();
     let today_date = parse_date(&today).ok_or("invalid today")?;
     let exam_date = plan
@@ -633,6 +732,17 @@ pub fn get_today_snapshot(app: AppHandle) -> Result<TodaySnapshot, String> {
 
     crate::refresh_tray_badge(&app);
 
+    let plan_variant = settings.plan_variant().to_string();
+    let plan_name = plan
+        .get("planName")
+        .and_then(|v| v.as_str())
+        .unwrap_or(if plan_variant == "v2" {
+            "考纲优化版"
+        } else {
+            "原版（视频课表）"
+        })
+        .to_string();
+
     Ok(TodaySnapshot {
         date: today,
         week_id,
@@ -651,13 +761,22 @@ pub fn get_today_snapshot(app: AppHandle) -> Result<TodaySnapshot, String> {
         week_lesson_nos,
         tasks: today_tasks,
         today_pending,
+        plan_variant,
+        plan_name,
     })
 }
 
 fn resolve_video_path_inner(app: &AppHandle, lesson_no: u32) -> Result<String, String> {
-    let plan = load_plan()?;
+    let plan = load_plan_for(&app)?;
     let settings = ensure_normalized_settings(app, &plan)?;
     let root = settings.root_dir.ok_or("请先选择资料根目录")?;
+
+    if (LIVE_NO_START..LIVE_NO_START + LIVE_NO_MAX).contains(&lesson_no) {
+        if let Some(path) = resolve_live_video_path(&root, lesson_no) {
+            return Ok(path.to_string_lossy().to_string());
+        }
+        return Err(format!("直播课第 {} 节不存在或尚未下载完成", lesson_no - 700));
+    }
 
     let lesson = plan
         .get("lessons")
@@ -685,6 +804,16 @@ pub fn resolve_video_path(app: AppHandle, lesson_no: u32) -> Result<String, Stri
 }
 
 #[tauri::command]
+pub fn get_live_catalog(app: AppHandle) -> Result<Vec<LiveCatalogLesson>, String> {
+    let plan = load_plan_for(&app)?;
+    let settings = ensure_normalized_settings(&app, &plan)?;
+    let Some(root) = settings.root_dir else {
+        return Ok(Vec::new());
+    };
+    Ok(scan_live_lessons(&root))
+}
+
+#[tauri::command]
 pub fn open_player(app: AppHandle, lesson_no: u32) -> Result<(), String> {
     ensure_player_window(&app, lesson_no)
 }
@@ -694,6 +823,44 @@ pub fn open_external_video(app: AppHandle, lesson_no: u32) -> Result<(), String>
     let path = resolve_video_path_inner(&app, lesson_no)?;
     tauri_plugin_opener::OpenerExt::opener(&app)
         .open_path(path, None::<&str>)
+        .map_err(|e| e.to_string())
+}
+
+fn default_material_root() -> PathBuf {
+    std::env::var("HOME")
+        .map(|h| PathBuf::from(h).join("Desktop/系规"))
+        .unwrap_or_else(|_| PathBuf::from("Desktop/系规"))
+}
+
+fn resolve_plan_spreadsheet_path(app: &AppHandle, variant: &str) -> Result<PathBuf, String> {
+    let name = match variant {
+        "v2" => "2026-学习计划-考纲优化版.xlsx",
+        _ => "2026-学习计划-原版.xlsx",
+    };
+    let settings = settings_for(app)?.1;
+    let root = settings
+        .root_dir
+        .as_deref()
+        .map(Path::new)
+        .filter(|p| p.is_dir())
+        .map(|p| p.to_path_buf())
+        .unwrap_or_else(default_material_root);
+    let path = root.join(name);
+    if path.exists() {
+        Ok(path)
+    } else {
+        Err(format!(
+            "未找到计划表 Excel：{}\n请在资料目录下运行 pnpm gen:plan-v2 生成",
+            path.display()
+        ))
+    }
+}
+
+#[tauri::command]
+pub fn open_plan_spreadsheet(app: AppHandle, variant: String) -> Result<(), String> {
+    let path = resolve_plan_spreadsheet_path(&app, &variant)?;
+    tauri_plugin_opener::OpenerExt::opener(&app)
+        .open_path(path.to_string_lossy().into_owned(), None::<&str>)
         .map_err(|e| e.to_string())
 }
 
@@ -912,7 +1079,7 @@ fn open_wechat_app() -> Result<(), String> {
 pub fn open_quiz(app: AppHandle, lesson_no: u32) -> Result<QuizOpenResult, String> {
     activate_for_action(&app);
     let quiz = load_quiz()?;
-    let plan = load_plan()?;
+    let plan = load_plan_for(&app)?;
 
     let short_link = quiz
         .get("shortLink")

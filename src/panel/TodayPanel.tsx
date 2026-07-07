@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import {
   getProgress,
+  getLiveCatalog,
   getPanelPinned,
   getSettings,
   getTodaySnapshot,
@@ -134,25 +135,30 @@ function lessonNoLabel(no: number, category?: string) {
   if (category === "special") {
     return `专${String(no - 900).padStart(2, "0")}`;
   }
+  if (category === "live") {
+    return `直${String(no - 700).padStart(2, "0")}`;
+  }
   return String(no).padStart(2, "0");
 }
 
 function catalogSections(catalog: CatalogLesson[]) {
-  const basic = catalog.filter((l) => l.category !== "special");
+  const basic = catalog.filter((l) => l.category !== "special" && l.category !== "live");
   const special = catalog.filter((l) => l.category === "special");
+  const live = catalog.filter((l) => l.category === "live");
   const sections: { id: string; title: string; lessons: CatalogLesson[] }[] = [
     { id: "basic", title: "基础课", lessons: basic },
   ];
   if (special.length > 0) {
     sections.push({ id: "special", title: "案例·论文专题", lessons: special });
   }
+  sections.push({ id: "live", title: "直播课", lessons: live });
   return sections;
 }
 
 const SECTION_EXPAND_KEY = "xigui-catalog-sections";
 
 function loadExpandedSections(): Record<string, boolean> {
-  const defaults = { basic: true, special: true };
+  const defaults = { basic: true, special: true, live: true };
   try {
     const raw = localStorage.getItem(SECTION_EXPAND_KEY);
     if (raw) return { ...defaults, ...(JSON.parse(raw) as Record<string, boolean>) };
@@ -210,7 +216,7 @@ function CatalogSectionBlock({
         type="button"
         onClick={() => onToggle(id)}
         aria-expanded={expanded}
-        className="catalog-section-header sticky top-0 z-10 flex w-full items-center justify-between rounded-lg bg-white px-2 py-1.5 text-left transition hover:bg-slate-50"
+        className="catalog-section-header sticky top-0 z-10 flex w-full items-center justify-between rounded-lg bg-white px-3 py-1.5 text-left transition hover:bg-slate-50"
       >
         <span className="flex min-w-0 items-center gap-1.5">
           <ChevronIcon expanded={expanded} />
@@ -225,17 +231,25 @@ function CatalogSectionBlock({
       </button>
       {expanded && (
         <div className="space-y-1.5">
-          {lessons.map((lesson) => (
-            <LessonRow
-              key={lesson.no}
-              lesson={lesson}
-              isThisWeek={weekLessonSet.has(lesson.no)}
-              quizName={quizName}
-              onPlay={onPlay}
-              onTextbook={onTextbook}
-              onQuiz={onQuiz}
-            />
-          ))}
+          {lessons.length === 0 ? (
+            <div className="lesson-card rounded-xl border border-dashed border-slate-200/80 bg-white px-3 py-3 text-center text-[11px] leading-5 text-slate-400">
+              {id === "live"
+                ? "暂无已下载的录屏 · 放入「03：直播课（陆续更新上传）」后刷新"
+                : "暂无课节"}
+            </div>
+          ) : (
+            lessons.map((lesson) => (
+              <LessonRow
+                key={lesson.no}
+                lesson={lesson}
+                isThisWeek={weekLessonSet.has(lesson.no)}
+                quizName={quizName}
+                onPlay={onPlay}
+                onTextbook={onTextbook}
+                onQuiz={onQuiz}
+              />
+            ))
+          )}
         </div>
       )}
     </div>
@@ -263,7 +277,7 @@ function LessonRow({
   const pct = progressPercent(lesson.position, lesson.duration, lesson.completed);
   const quizTip = quizTooltip(lesson.title, quizName);
   const bookTip = textbookTooltip(lesson.textbookPage);
-  const showStudyExtras = lesson.category !== "special";
+  const showStudyExtras = lesson.category !== "special" && lesson.category !== "live";
 
   return (
     <div
@@ -341,13 +355,14 @@ function LessonRow({
 }
 
 async function loadCatalog(): Promise<CatalogLesson[]> {
-  const [plan, progress, textbook] = await Promise.all([
+  const [plan, progress, textbook, liveLessons] = await Promise.all([
     loadPlan() as Promise<PlanFile>,
     getProgress(),
     loadTextbook() as Promise<TextbookFile>,
+    getLiveCatalog().catch(() => []),
   ]);
 
-  return Object.values(plan.lessons)
+  const fromPlan = Object.values(plan.lessons)
     .sort((a, b) => a.no - b.no)
     .map((lesson) => {
       const saved = progress.videos[String(lesson.no)];
@@ -363,6 +378,21 @@ async function loadCatalog(): Promise<CatalogLesson[]> {
         textbookPage: page,
       };
     });
+
+  const live = liveLessons.map((lesson) => {
+    const saved = progress.videos[String(lesson.no)];
+    return {
+      no: lesson.no,
+      title: lesson.title,
+      category: "live" as const,
+      missing: lesson.missing,
+      position: saved?.position ?? 0,
+      duration: saved?.duration ?? 0,
+      completed: saved?.completed ?? false,
+    };
+  });
+
+  return [...fromPlan, ...live];
 }
 
 export default function TodayPanel() {
@@ -447,7 +477,9 @@ export default function TodayPanel() {
       .then(setPinned)
       .catch(() => undefined);
     getSettings()
-      .then((s) => setWovenStyleOn(s.wovenStyle ?? false))
+      .then((s) => {
+        setWovenStyleOn(s.wovenStyle ?? false);
+      })
       .catch(() => undefined);
   }, [refresh]);
 
@@ -608,16 +640,28 @@ export default function TodayPanel() {
               </button>
             </Tooltip>
             <div className="relative" ref={menuRef}>
-              <Tooltip label="设置">
+              {menuOpen ? (
                 <button
                   type="button"
-                  onClick={() => setMenuOpen((v) => !v)}
+                  onClick={() => setMenuOpen(false)}
                   aria-label="设置"
-                  className={`${headerBtn} ${menuOpen ? "bg-slate-100 text-slate-700" : ""}`}
+                  aria-expanded
+                  className={`${headerBtn} bg-slate-100 text-slate-700`}
                 >
                   <GearIcon />
                 </button>
-              </Tooltip>
+              ) : (
+                <Tooltip label="设置">
+                  <button
+                    type="button"
+                    onClick={() => setMenuOpen(true)}
+                    aria-label="设置"
+                    className={headerBtn}
+                  >
+                    <GearIcon />
+                  </button>
+                </Tooltip>
+              )}
             {menuOpen && (
               <div className="settings-menu absolute right-0 top-full z-20 mt-1 min-w-[168px] overflow-hidden rounded-xl border border-slate-200/80 bg-white py-1 shadow-lg">
                 <button
@@ -626,7 +670,7 @@ export default function TodayPanel() {
                   onClick={handlePickRoot}
                   className="w-full px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 disabled:opacity-50"
                 >
-                  {picking ? "选择中…" : "选择资料目录"}
+                  {picking ? "选择中…" : "资料目录…"}
                 </button>
                 <button
                   type="button"
@@ -634,7 +678,7 @@ export default function TodayPanel() {
                   onClick={handlePickTextbook}
                   className="w-full px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 disabled:opacity-50"
                 >
-                  {pickingTextbook ? "选择中…" : "选择教材 PDF"}
+                  {pickingTextbook ? "选择中…" : "教材 PDF…"}
                 </button>
                 <button
                   type="button"
@@ -645,7 +689,7 @@ export default function TodayPanel() {
                   }}
                   className="w-full px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50"
                 >
-                  {eyeRestOn ? "✓ 护眼提醒（20-20-20）" : "护眼提醒（20-20-20）"}
+                  {eyeRestOn ? "✓ 护眼（看视频时）" : "护眼（看视频时）"}
                 </button>
                 <button
                   type="button"
@@ -695,7 +739,7 @@ export default function TodayPanel() {
                 style={{ width: `${weekPct}%` }}
               />
             </div>
-            <div className="mt-2 text-xs leading-5 text-slate-500">
+            <div className="mt-2 line-clamp-2 text-xs leading-5 text-slate-500" title={snapshot.focus}>
               {snapshot.focus}
             </div>
           </div>
@@ -709,7 +753,7 @@ export default function TodayPanel() {
               onClick={handlePickRoot}
               className="w-full rounded-xl border border-dashed border-slate-300 py-3 text-sm text-slate-600 hover:border-blue-300 hover:text-blue-600 disabled:opacity-60"
             >
-              {picking ? "选择中…" : "选择资料目录"}
+              {picking ? "选择中…" : "选择资料目录（Desktop/系规）"}
             </button>
           </div>
         )}

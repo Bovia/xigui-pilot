@@ -66,13 +66,16 @@ pub fn run() {
             commands::mark_task_done,
             commands::get_today_snapshot,
             commands::resolve_video_path,
+            commands::get_live_catalog,
             commands::open_player,
             commands::open_external_video,
+            commands::open_plan_spreadsheet,
             commands::open_textbook,
             commands::open_quiz,
             commands::get_panel_pinned,
             commands::set_panel_pinned,
             commands::set_woven_style,
+            commands::set_plan_variant,
             commands::quit_app,
         ])
         .build(tauri::generate_context!())
