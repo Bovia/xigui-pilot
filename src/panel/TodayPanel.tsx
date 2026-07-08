@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, Fragment } from "react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import {
   getProgress,
@@ -13,24 +13,39 @@ import {
   openPlayer,
   openQuiz,
   openTextbook,
+  openTricolorNotes,
   pickRootDir,
   pickTextbook,
+  pickTricolorNotes,
   quitApp,
   setPanelPinned,
   setFloatingSubtitles,
   setWovenStyle,
 } from "../lib/api";
-import { getPlanHighlight } from "../lib/dynamicPlan";
-import { PLAN_VIEW_EVENT, readPlanSheetView } from "../lib/planSheetView";
+import {
+  formatWenTodayMarquee,
+  getWenBenchmark,
+  type WenBenchmark,
+} from "../lib/wenPlan";
+import { computeLessonTags, type LessonTagState } from "../lib/lessonTags";
+import { formatTodayMarquee, computeTodayPlanProgress, type TodayPlanProgress } from "../lib/pacePlan";
+import { PLAN_VIEW_EVENT } from "../lib/planSheetView";
+import { PACE_CHANGED_EVENT, readDailyStudyHours } from "../lib/studyPace";
+import {
+  formatStageMarquee,
+  getStageCard,
+  type StageCard,
+} from "../lib/studyStage";
 import type { CatalogLesson, PlanFile, TextbookFile, TodaySnapshot } from "../lib/types";
 import {
   isEyeRestEnabled,
   setEyeRestEnabled,
-  textbookTooltip,
 } from "../lib/eyeRest";
 import { quizTooltip } from "../lib/quiz";
 import Tooltip from "../components/Tooltip";
+import BookTooltip from "../components/BookTooltip";
 import HelpGuide from "../components/HelpGuide";
+import ProgressHintMarquee from "../components/ProgressHintMarquee";
 import StudyPlanSheet from "../components/StudyPlanSheet";
 
 function formatDate(date: string) {
@@ -188,17 +203,88 @@ function ChevronIcon({ expanded }: { expanded: boolean }) {
   );
 }
 
+function StageStatusCard({
+  card,
+  todayProgress,
+  showTodayBar,
+}: {
+  card: StageCard;
+  todayProgress: TodayPlanProgress | null;
+  showTodayBar: boolean;
+}) {
+  if (card.kind === "recording") {
+    return (
+      <div className="rounded-xl border border-slate-200/80 bg-slate-50/80 px-3 py-2.5">
+        <div className="text-[12px] font-semibold text-slate-800">
+          {card.phase}（{card.subLabel}）
+        </div>
+        <p className="mt-1 text-[11px] leading-5 text-slate-500">
+          录播剩余 {card.remainingLessons} 节 · 约 {card.remainingHours.toFixed(1)} 小时
+        </p>
+        {showTodayBar && todayProgress && (
+          <div className="mt-2.5">
+            <div className="mb-1 flex items-center justify-between text-[11px] text-slate-500">
+              <span>
+                今日 {todayProgress.lessonDone}/{todayProgress.lessonTotal} 节
+              </span>
+              <span>{todayProgress.timePct}%</span>
+            </div>
+            <div className="woven-progress-track h-1.5 overflow-hidden rounded-full bg-slate-200/80">
+              <div
+                className="woven-progress-fill h-full rounded-full bg-blue-500 transition-all"
+                style={{ width: `${todayProgress.timePct}%` }}
+              />
+            </div>
+            <p className="mt-1 text-[10px] text-slate-400">
+              已学 {todayProgress.watchedHours.toFixed(1)} / {todayProgress.plannedHours.toFixed(1)} 小时
+            </p>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <div className="rounded-xl border border-violet-200/80 bg-violet-50/50 px-3 py-2.5">
+      <div className="text-[12px] font-semibold text-slate-800">{card.phase}</div>
+      {card.focus && (
+        <p className="mt-1 text-[11px] leading-5 text-slate-600">{card.focus}</p>
+      )}
+      <ul className="mt-1.5 space-y-0.5 text-[11px] leading-5 text-slate-500">
+        {card.hints.map((hint) => (
+          <li key={hint}>· {hint}</li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+function WenDivider() {
+  return (
+    <div
+      className="wen-divider relative z-[1] -my-1.5 flex items-center justify-center py-1"
+      role="separator"
+      aria-label="文老师课程进度"
+    >
+      <div className="wen-divider-line absolute inset-x-4 top-1/2 border-t border-dashed border-slate-300/90" />
+      <span className="wen-divider-label relative bg-white px-2 text-[10px] font-medium text-slate-500">
+        文老师
+      </span>
+    </div>
+  );
+}
+
 function CatalogSectionBlock({
   id,
   title,
   lessons,
   expanded,
   onToggle,
-  highlightLessonSet,
-  tagLabel,
+  lessonTags,
   quizName,
   onPlay,
   onTextbook,
+  onTricolorNotes,
   onQuiz,
 }: {
   id: string;
@@ -206,33 +292,26 @@ function CatalogSectionBlock({
   lessons: CatalogLesson[];
   expanded: boolean;
   onToggle: (id: string) => void;
-  highlightLessonSet: Set<number>;
-  tagLabel: "今天" | "本周";
+  lessonTags: LessonTagState;
   quizName: string;
   onPlay: (lesson: CatalogLesson) => void;
   onTextbook: (lesson: CatalogLesson) => void;
+  onTricolorNotes: (lesson: CatalogLesson) => void;
   onQuiz: (lesson: CatalogLesson) => void;
 }) {
-  const highlightCount = lessons.filter((l) => highlightLessonSet.has(l.no)).length;
-
   return (
     <div className="space-y-1.5">
       <button
         type="button"
         onClick={() => onToggle(id)}
         aria-expanded={expanded}
-        className="catalog-section-header sticky top-0 z-10 flex w-full items-center justify-between rounded-lg bg-white px-3 py-1.5 text-left transition hover:bg-slate-50"
+        className="catalog-section-header sticky top-0 z-10 flex w-full items-center rounded-lg bg-white px-3 py-1.5 text-left transition hover:bg-slate-50"
       >
         <span className="flex min-w-0 items-center gap-1.5">
           <ChevronIcon expanded={expanded} />
           <span className="truncate text-[11px] font-medium text-slate-600">{title}</span>
           <span className="shrink-0 text-[10px] text-slate-400">{lessons.length} 节</span>
         </span>
-        {highlightCount > 0 && (
-          <span className="woven-badge-week ml-2 shrink-0 rounded bg-blue-100 px-1.5 py-0.5 text-[9px] font-medium text-blue-600">
-            {tagLabel} {highlightCount}
-          </span>
-        )}
       </button>
       {expanded && (
         <div className="space-y-1.5">
@@ -243,18 +322,26 @@ function CatalogSectionBlock({
                 : "暂无课节"}
             </div>
           ) : (
-            lessons.map((lesson) => (
-              <LessonRow
-                key={lesson.no}
-                lesson={lesson}
-                isHighlighted={highlightLessonSet.has(lesson.no)}
-                tagLabel={tagLabel}
-                quizName={quizName}
-                onPlay={onPlay}
-                onTextbook={onTextbook}
-                onQuiz={onQuiz}
-              />
-            ))
+            lessons.map((lesson, index) => {
+              const isWen = lessonTags.wenLessonNos.has(lesson.no);
+              const prevWen =
+                index > 0 && lessonTags.wenLessonNos.has(lessons[index - 1]!.no);
+              return (
+                <Fragment key={lesson.no}>
+                  {isWen && !prevWen && <WenDivider />}
+                  <LessonRow
+                    lesson={lesson}
+                    isExecution={lessonTags.executionLessonNos.has(lesson.no)}
+                    executionLabel={lessonTags.executionLabel}
+                    quizName={quizName}
+                    onPlay={onPlay}
+                    onTextbook={onTextbook}
+                    onTricolorNotes={onTricolorNotes}
+                    onQuiz={onQuiz}
+                  />
+                </Fragment>
+              );
+            })
           )}
         </div>
       )}
@@ -267,33 +354,34 @@ const headerBtn =
 
 function LessonRow({
   lesson,
-  isHighlighted,
-  tagLabel,
+  isExecution,
+  executionLabel,
   quizName,
   onPlay,
   onTextbook,
+  onTricolorNotes,
   onQuiz,
 }: {
   lesson: CatalogLesson;
-  isHighlighted: boolean;
-  tagLabel: "今天" | "本周";
+  isExecution: boolean;
+  executionLabel: "今天" | "本周" | null;
   quizName: string;
   onPlay: (lesson: CatalogLesson) => void;
   onTextbook: (lesson: CatalogLesson) => void;
+  onTricolorNotes: (lesson: CatalogLesson) => void;
   onQuiz: (lesson: CatalogLesson) => void;
 }) {
   const pct = progressPercent(lesson.position, lesson.duration, lesson.completed);
   const quizTip = quizTooltip(lesson.title, quizName);
-  const bookTip = textbookTooltip(lesson.textbookPage);
   const showStudyExtras = lesson.category !== "special" && lesson.category !== "live";
 
   return (
     <div
       className={`lesson-card relative rounded-xl border px-3 py-2.5 transition ${
-        isHighlighted ? "lesson-card--week border-blue-200/80 bg-blue-50/30" : "border-slate-200/80 bg-white"
+        isExecution ? "lesson-card--week border-blue-200/80 bg-blue-50/30" : "border-slate-200/80 bg-white"
       } ${lesson.completed ? "opacity-75" : ""} ${lesson.missing ? "opacity-45" : ""}`}
     >
-      {isHighlighted && (
+      {isExecution && (
         <span className="absolute left-0 top-2 bottom-2 w-0.5 rounded-full bg-blue-500" />
       )}
       <div className="flex items-center gap-2">
@@ -302,9 +390,9 @@ function LessonRow({
         </span>
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-1.5">
-            {isHighlighted && (
+            {isExecution && executionLabel && (
               <span className="woven-badge-week shrink-0 rounded bg-blue-100 px-1 py-0.5 text-[9px] font-medium text-blue-600">
-                {tagLabel}
+                {executionLabel}
               </span>
             )}
             <div className="truncate text-[12px] font-medium leading-5 text-slate-800">
@@ -335,15 +423,12 @@ function LessonRow({
                   题
                 </button>
               </Tooltip>
-              <Tooltip label={bookTip.label} detail={bookTip.detail}>
-                <button
-                  type="button"
-                  onClick={() => onTextbook(lesson)}
-                  className="woven-btn-tag flex h-8 w-8 items-center justify-center rounded-full border border-amber-200 bg-amber-50 text-[10px] font-medium text-amber-700 hover:bg-amber-100"
-                >
-                  书
-                </button>
-              </Tooltip>
+              <BookTooltip
+                lessonTitle={lesson.title}
+                textbookPage={lesson.textbookPage}
+                onTextbook={() => onTextbook(lesson)}
+                onTricolorNotes={() => onTricolorNotes(lesson)}
+              />
             </>
           )}
           <Tooltip label="播放课程">
@@ -403,14 +488,29 @@ async function loadCatalog(): Promise<CatalogLesson[]> {
   return [...fromPlan, ...live];
 }
 
-async function fetchPlanHighlight(weekId: string, today: string) {
-  const view = readPlanSheetView();
-  const [planV2, planWen, progress] = await Promise.all([
-    loadPlan("v2") as Promise<PlanFile>,
+async function loadPanelMeta(snapshot: TodaySnapshot) {
+  const [plan, planWen, progress] = await Promise.all([
+    loadPlan("default") as Promise<PlanFile>,
     loadPlan("wen") as Promise<PlanFile>,
     getProgress(),
   ]);
-  return getPlanHighlight(view, planV2, planWen, progress.videos, today, weekId);
+  const dailyHours = readDailyStudyHours();
+  const stageCard = getStageCard(plan, planWen, progress.videos, snapshot.date);
+  return {
+    tags: computeLessonTags(plan, planWen, progress.videos, snapshot.date, dailyHours),
+    stageCard,
+    stageText: formatStageMarquee(stageCard),
+    todayText: formatTodayMarquee(plan, progress.videos, snapshot.date, dailyHours),
+    wenText: formatWenTodayMarquee(planWen, snapshot.date),
+    benchmark: getWenBenchmark(planWen, snapshot.date),
+    todayProgress: computeTodayPlanProgress(
+      plan,
+      progress.videos,
+      snapshot.date,
+      dailyHours,
+    ),
+    showTodayBar: stageCard.kind === "recording" && stageCard.phase.includes("阶段一"),
+  };
 }
 
 export default function TodayPanel() {
@@ -420,6 +520,7 @@ export default function TodayPanel() {
   const [error, setError] = useState<string | null>(null);
   const [picking, setPicking] = useState(false);
   const [pickingTextbook, setPickingTextbook] = useState(false);
+  const [pickingTricolorNotes, setPickingTricolorNotes] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [eyeRestOn, setEyeRestOn] = useState(isEyeRestEnabled);
   const [quizName, setQuizName] = useState("郑房新一点通");
@@ -429,10 +530,18 @@ export default function TodayPanel() {
   const [guideOpen, setGuideOpen] = useState(false);
   const [planOpen, setPlanOpen] = useState(false);
   const [expandedSections, setExpandedSections] = useState(loadExpandedSections);
-  const [planHighlight, setPlanHighlight] = useState<{
-    lessonNos: Set<number>;
-    tagLabel: "今天" | "本周";
-  }>({ lessonNos: new Set(), tagLabel: "本周" });
+  const [lessonTags, setLessonTags] = useState<LessonTagState>({
+    wenLessonNos: new Set(),
+    executionLessonNos: new Set(),
+    executionLabel: null,
+  });
+  const [wenBenchmark, setWenBenchmark] = useState<WenBenchmark | null>(null);
+  const [stageCard, setStageCard] = useState<StageCard | null>(null);
+  const [todayProgress, setTodayProgress] = useState<TodayPlanProgress | null>(null);
+  const [showTodayBar, setShowTodayBar] = useState(false);
+  const [stageText, setStageText] = useState("—");
+  const [todayMarquee, setTodayMarquee] = useState("—");
+  const [wenMarquee, setWenMarquee] = useState("—");
   const menuRef = useRef<HTMLDivElement>(null);
 
   const toggleSection = useCallback((id: string) => {
@@ -455,11 +564,25 @@ export default function TodayPanel() {
         setCatalog([]);
       }
       try {
-        setPlanHighlight(await fetchPlanHighlight(data.weekId, data.date));
+        const meta = await loadPanelMeta(data);
+        setWenBenchmark(meta.benchmark);
+        setStageCard(meta.stageCard);
+        setStageText(meta.stageText);
+        setTodayMarquee(meta.todayText);
+        setWenMarquee(meta.wenText);
+        setTodayProgress(meta.todayProgress);
+        setShowTodayBar(meta.showTodayBar);
+        setLessonTags(meta.tags);
       } catch {
-        setPlanHighlight({
-          lessonNos: new Set(data.weekLessonNos ?? []),
-          tagLabel: "本周",
+        setWenBenchmark(null);
+        setStageCard(null);
+        setStageText("—");
+        setTodayMarquee("—");
+        setWenMarquee("—");
+        setLessonTags({
+          wenLessonNos: new Set(),
+          executionLessonNos: new Set(),
+          executionLabel: null,
         });
       }
     } catch (e) {
@@ -470,7 +593,7 @@ export default function TodayPanel() {
   }, []);
 
   const handlePickRoot = useCallback(async () => {
-    if (picking || pickingTextbook) return;
+    if (picking || pickingTextbook || pickingTricolorNotes) return;
     setPicking(true);
     setMenuOpen(false);
     setError(null);
@@ -482,10 +605,10 @@ export default function TodayPanel() {
     } finally {
       setPicking(false);
     }
-  }, [picking, pickingTextbook, refresh]);
+  }, [picking, pickingTextbook, pickingTricolorNotes, refresh]);
 
   const handlePickTextbook = useCallback(async () => {
-    if (picking || pickingTextbook) return;
+    if (picking || pickingTextbook || pickingTricolorNotes) return;
     setPickingTextbook(true);
     setMenuOpen(false);
     setError(null);
@@ -497,7 +620,22 @@ export default function TodayPanel() {
     } finally {
       setPickingTextbook(false);
     }
-  }, [picking, pickingTextbook, refresh, snapshot?.rootPath]);
+  }, [picking, pickingTextbook, pickingTricolorNotes, refresh, snapshot?.rootPath]);
+
+  const handlePickTricolorNotes = useCallback(async () => {
+    if (picking || pickingTextbook || pickingTricolorNotes) return;
+    setPickingTricolorNotes(true);
+    setMenuOpen(false);
+    setError(null);
+    try {
+      await pickTricolorNotes(snapshot?.rootPath);
+      await refresh();
+    } catch (e) {
+      setError(String(e));
+    } finally {
+      setPickingTricolorNotes(false);
+    }
+  }, [picking, pickingTextbook, pickingTricolorNotes, refresh, snapshot?.rootPath]);
 
   useEffect(() => {
     refresh();
@@ -513,6 +651,14 @@ export default function TodayPanel() {
         setFloatingSubtitlesOn(s.floatingSubtitles ?? true);
       })
       .catch(() => undefined);
+  }, [refresh]);
+
+  useEffect(() => {
+    const onFocus = () => {
+      refresh();
+    };
+    window.addEventListener("focus", onFocus);
+    return () => window.removeEventListener("focus", onFocus);
   }, [refresh]);
 
   useEffect(() => {
@@ -537,13 +683,25 @@ export default function TodayPanel() {
 
   useEffect(() => {
     if (!snapshot) return;
-    const onPlanViewChange = () => {
-      fetchPlanHighlight(snapshot.weekId, snapshot.date)
-        .then(setPlanHighlight)
+    const refreshMeta = () => {
+      loadPanelMeta(snapshot)
+        .then((meta) => {
+          setLessonTags(meta.tags);
+          setStageCard(meta.stageCard);
+          setStageText(meta.stageText);
+          setTodayMarquee(meta.todayText);
+          setWenMarquee(meta.wenText);
+          setTodayProgress(meta.todayProgress);
+          setShowTodayBar(meta.showTodayBar);
+        })
         .catch(() => undefined);
     };
-    window.addEventListener(PLAN_VIEW_EVENT, onPlanViewChange);
-    return () => window.removeEventListener(PLAN_VIEW_EVENT, onPlanViewChange);
+    window.addEventListener(PLAN_VIEW_EVENT, refreshMeta);
+    window.addEventListener(PACE_CHANGED_EVENT, refreshMeta);
+    return () => {
+      window.removeEventListener(PLAN_VIEW_EVENT, refreshMeta);
+      window.removeEventListener(PACE_CHANGED_EVENT, refreshMeta);
+    };
   }, [snapshot]);
 
   const handlePlay = async (lesson: CatalogLesson) => {
@@ -574,6 +732,25 @@ export default function TodayPanel() {
         await handlePickTextbook();
         try {
           await openTextbook(lesson.no);
+        } catch (retryErr) {
+          setError(String(retryErr));
+        }
+        return;
+      }
+      setError(msg);
+    }
+  };
+
+  const handleTricolorNotes = async (lesson: CatalogLesson) => {
+    setError(null);
+    try {
+      await openTricolorNotes(lesson.no);
+    } catch (e) {
+      const msg = String(e);
+      if (msg.includes("请先选择三色笔记文件夹")) {
+        await handlePickTricolorNotes();
+        try {
+          await openTricolorNotes(lesson.no);
         } catch (retryErr) {
           setError(String(retryErr));
         }
@@ -622,10 +799,7 @@ export default function TodayPanel() {
     }
   };
 
-  const weekPct =
-    snapshot && snapshot.weekTotal
-      ? Math.round((snapshot.weekDone / snapshot.weekTotal) * 100)
-      : 0;
+  const headerWeekLabel = wenBenchmark?.weekLabel ?? snapshot?.weekLabel;
 
   const playableCount = catalog.filter((l) => !l.missing).length;
 
@@ -639,7 +813,6 @@ export default function TodayPanel() {
       <StudyPlanSheet
         open={planOpen}
         onClose={() => setPlanOpen(false)}
-        currentWeekId={snapshot?.weekId}
         daysToExam={snapshot?.daysToExam}
       />
       <div className="flex h-full flex-col p-4">
@@ -658,7 +831,7 @@ export default function TodayPanel() {
             </div>
             {snapshot && (
               <div className="mt-1 text-xs text-slate-500">
-                {formatDate(snapshot.date)} · {snapshot.weekLabel}
+                {formatDate(snapshot.date)} · {headerWeekLabel}
                 {snapshot.rootConfigured && catalog.length > 0
                   ? ` · ${playableCount}/${catalog.length} 节`
                   : ""}
@@ -718,7 +891,7 @@ export default function TodayPanel() {
               <div className="settings-menu absolute right-0 top-full z-20 mt-1 min-w-[168px] overflow-hidden rounded-xl border border-slate-200/80 bg-white py-1 shadow-lg">
                 <button
                   type="button"
-                  disabled={picking || pickingTextbook}
+                  disabled={picking || pickingTextbook || pickingTricolorNotes}
                   onClick={handlePickRoot}
                   className="w-full px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 disabled:opacity-50"
                 >
@@ -726,11 +899,19 @@ export default function TodayPanel() {
                 </button>
                 <button
                   type="button"
-                  disabled={picking || pickingTextbook}
+                  disabled={picking || pickingTextbook || pickingTricolorNotes}
                   onClick={handlePickTextbook}
                   className="w-full px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 disabled:opacity-50"
                 >
                   {pickingTextbook ? "选择中" : "选择教材 PDF"}
+                </button>
+                <button
+                  type="button"
+                  disabled={picking || pickingTextbook || pickingTricolorNotes}
+                  onClick={handlePickTricolorNotes}
+                  className="w-full px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                >
+                  {pickingTricolorNotes ? "选择中" : "选择三色笔记文件夹"}
                 </button>
                 <button
                   type="button"
@@ -784,23 +965,18 @@ export default function TodayPanel() {
           </div>
         </div>
 
-        {snapshot && (
+        {snapshot && stageCard && (
           <div className="mb-3">
-            <div className="mb-1 flex items-center justify-between text-xs text-slate-500">
-              <span>
-                本周 {snapshot.weekDone}/{snapshot.weekTotal}
-              </span>
-              <span>{weekPct}%</span>
-            </div>
-            <div className="woven-progress-track h-1.5 overflow-hidden rounded-full bg-slate-100">
-              <div
-                className="woven-progress-fill h-full rounded-full bg-blue-500 transition-all"
-                style={{ width: `${weekPct}%` }}
-              />
-            </div>
-            <div className="mt-2 line-clamp-2 text-xs leading-5 text-slate-500" title={snapshot.focus}>
-              {snapshot.focus}
-            </div>
+            <StageStatusCard
+              card={stageCard}
+              todayProgress={todayProgress}
+              showTodayBar={showTodayBar}
+            />
+            <ProgressHintMarquee
+              stageText={stageText}
+              todayText={todayMarquee}
+              wenText={wenMarquee}
+            />
           </div>
         )}
 
@@ -834,11 +1010,11 @@ export default function TodayPanel() {
                 lessons={section.lessons}
                 expanded={expandedSections[section.id] ?? true}
                 onToggle={toggleSection}
-                highlightLessonSet={planHighlight.lessonNos}
-                tagLabel={planHighlight.tagLabel}
+                lessonTags={lessonTags}
                 quizName={quizName}
                 onPlay={handlePlay}
                 onTextbook={handleTextbook}
+                onTricolorNotes={handleTricolorNotes}
                 onQuiz={handleQuiz}
               />
             ))}

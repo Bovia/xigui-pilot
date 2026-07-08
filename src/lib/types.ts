@@ -35,6 +35,7 @@ export interface TodaySnapshot {
 export interface Settings {
   rootDir?: string | null;
   textbookDir?: string | null;
+  tricolorNotesDir?: string | null;
   panelPinned?: boolean | null;
   wovenStyle?: boolean | null;
   planVariant?: string | null;
@@ -66,6 +67,8 @@ export interface CatalogLesson {
 export interface TextbookFile {
   textbookSubdir: string;
   textbookFilename: string;
+  tricolorNotesSubdir?: string;
+  tricolorNotesFilenameTemplate?: string;
   lessons: Record<string, { page: number }>;
 }
 

@@ -6,6 +6,8 @@ export type PlanLessonRow = {
   title: string;
   done: boolean;
   missing: boolean;
+  /** 有学习活动但未 completed（续播） */
+  inProgress?: boolean;
 };
 
 export type WeekDayRow = {
@@ -27,11 +29,6 @@ export type ProgressVideo = {
 };
 
 export type ProgressVideos = Record<string, ProgressVideo>;
-
-export type PlanHighlight = {
-  lessonNos: Set<number>;
-  tagLabel: "今天" | "本周";
-};
 
 const WEEKDAY = ["日", "一", "二", "三", "四", "五", "六"];
 
@@ -70,6 +67,15 @@ function lessonTitleMap(plan: PlanFile) {
       map.set(task.lessonNo, {
         title: task.title,
         missing: task.missing ?? false,
+      });
+    }
+  }
+  const lessons = plan.lessons ?? {};
+  for (const lesson of Object.values(lessons)) {
+    if (!map.has(lesson.no)) {
+      map.set(lesson.no, {
+        title: lesson.title,
+        missing: lesson.missing ?? false,
       });
     }
   }
@@ -124,15 +130,34 @@ function incompleteQueue(plan: PlanFile, progress: ProgressVideos) {
   return orderedTasks(plan).filter((t) => !isLessonDone(t.lessonNo, progress));
 }
 
+/** 本周考纲课节，按节次排序 */
+function orderedWeekTasks(week: PlanWeek) {
+  return [...(week.tasks ?? [])]
+    .filter((t) => t.lessonNo != null)
+    .sort((a, b) => a.lessonNo! - b.lessonNo!);
+}
+
+/** 本周范围内未完成队列（3→4→5…，仅本周 tasks） */
+function incompleteWeekQueue(plan: PlanFile, progress: ProgressVideos, weekId: string) {
+  const week = findPlanWeek(plan, weekId);
+  if (!week) return [];
+  return orderedWeekTasks(week).filter((t) => !isLessonDone(t.lessonNo!, progress));
+}
+
+function weekLessonNoSet(plan: PlanFile, weekId: string) {
+  return new Set(weekLessonNos(plan, weekId));
+}
+
 export function findPlanWeek(plan: PlanFile, weekId: string): PlanWeek | undefined {
   return plan.weeks?.find((w) => w.id === weekId);
 }
 
-/** 某天实际学过的课（事实轨） */
+/** 某天实际学过的课（事实轨），可限定本周课节 */
 export function factualLessonsOnDate(
   plan: PlanFile,
   progress: ProgressVideos,
   date: string,
+  onlyLessonNos?: Set<number>,
 ): PlanLessonRow[] {
   const titles = lessonTitleMap(plan);
   const rows: PlanLessonRow[] = [];
@@ -141,25 +166,27 @@ export function factualLessonsOnDate(
     if (activityDate(video) !== date) continue;
     const lessonNo = Number(key);
     if (!Number.isFinite(lessonNo)) continue;
+    if (onlyLessonNos && !onlyLessonNos.has(lessonNo)) continue;
     const meta = titles.get(lessonNo);
     rows.push({
       lessonNo,
       title: meta?.title ?? `第 ${lessonNo} 节`,
       done: video.completed,
       missing: meta?.missing ?? false,
+      inProgress: hasStudyActivity(video) && !video.completed,
     });
   }
   return rows.sort((a, b) => a.lessonNo - b.lessonNo);
 }
 
-/** 同一进位算法：从未完成队列填入工作日格子（span = 日） */
+/** 本周考纲内进位：未完成队列填入今天起的工作日（每天 1 节） */
 function fillForwardBuckets(
   plan: PlanFile,
   progress: ProgressVideos,
   today: string,
   week: PlanWeek,
 ) {
-  const queue = incompleteQueue(plan, progress);
+  const queue = incompleteWeekQueue(plan, progress, week.id);
   const forward = new Map<string, number[]>();
   let queueIdx = 0;
 
@@ -168,7 +195,7 @@ function fillForwardBuckets(
     const d = parseLocalDate(date);
     if (isWeekend(d)) continue;
     if (queueIdx >= queue.length) break;
-    forward.set(date, [queue[queueIdx].lessonNo]);
+    forward.set(date, [queue[queueIdx]!.lessonNo!]);
     queueIdx += 1;
   }
 
@@ -183,8 +210,11 @@ function ensureDayLock(
 ) {
   clearPlanDayLockIfStale(today);
   const existing = readPlanDayLock();
+  const weekNos = weekLessonNoSet(plan, weekId);
   if (existing && existing.date === today && existing.weekId === weekId) {
-    return existing;
+    const locked = Object.values(existing.forwardByDate).flat();
+    const valid = locked.every((n) => weekNos.has(n));
+    if (valid) return existing;
   }
 
   const week = findPlanWeek(plan, weekId);
@@ -232,9 +262,10 @@ export function buildWeekDailyPlan(
   if (!week) return [];
 
   const lock = ensureDayLock(plan, progress, today, weekId);
+  const weekQueue = incompleteWeekQueue(plan, progress, weekId);
   const queueExhausted =
-    incompleteQueue(plan, progress).length <=
-    Object.values(lock.forwardByDate).flat().length;
+    weekQueue.length <= Object.values(lock.forwardByDate).flat().length;
+  const weekNos = weekLessonNoSet(plan, weekId);
 
   return datesBetween(week.start, week.end).map((date) => {
     const d = parseLocalDate(date);
@@ -255,7 +286,7 @@ export function buildWeekDailyPlan(
     }
 
     if (isPast) {
-      const lessons = factualLessonsOnDate(plan, progress, date);
+      const lessons = factualLessonsOnDate(plan, progress, date, weekNos);
       return {
         date,
         weekday: WEEKDAY[d.getDay()],
@@ -289,9 +320,7 @@ export function buildWeekDailyPlan(
 export function weekLessonNos(plan: PlanFile, weekId: string): number[] {
   const week = findPlanWeek(plan, weekId);
   if (!week) return [];
-  return (week.tasks ?? [])
-    .map((t) => t.lessonNo)
-    .filter((n): n is number => n != null);
+  return orderedWeekTasks(week).map((t) => t.lessonNo!);
 }
 
 export function wenTodayLessonNos(plan: PlanFile, today: string): number[] {
@@ -300,37 +329,32 @@ export function wenTodayLessonNos(plan: PlanFile, today: string): number[] {
     .map((t) => t.lessonNo);
 }
 
-export function getPlanHighlight(
+export type ExecutionTag = "今天" | "本周";
+
+export type ExecutionHighlight = {
+  lessonNos: Set<number>;
+  tagLabel: ExecutionTag | null;
+};
+
+/** 考纲执行层：overview→本周，weekDaily→今天，wenOverview→无 */
+export function getExecutionHighlight(
   view: PlanSheetView,
   planV2: PlanFile,
-  planWen: PlanFile | null,
   progress: ProgressVideos,
   today: string,
   weekId: string,
-): PlanHighlight {
+): ExecutionHighlight {
   if (view === "weekDaily") {
     const lock = ensureDayLock(planV2, progress, today, weekId);
-    return {
-      lessonNos: new Set(lock.todayLessonNos),
-      tagLabel: "今天",
-    };
+    return { lessonNos: new Set(lock.todayLessonNos), tagLabel: "今天" };
   }
-
-  if (view === "wenOverview" && planWen) {
-    const todayNos = wenTodayLessonNos(planWen, today);
-    if (todayNos.length > 0) {
-      return { lessonNos: new Set(todayNos), tagLabel: "今天" };
-    }
+  if (view === "overview") {
     return {
-      lessonNos: new Set(weekLessonNos(planWen, weekId)),
+      lessonNos: new Set(weekLessonNos(planV2, weekId)),
       tagLabel: "本周",
     };
   }
-
-  return {
-    lessonNos: new Set(weekLessonNos(planV2, weekId)),
-    tagLabel: "本周",
-  };
+  return { lessonNos: new Set(), tagLabel: null };
 }
 
 export function dynamicStatus(plan: PlanFile, progress: ProgressVideos, _today: string) {

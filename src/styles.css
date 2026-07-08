@@ -285,6 +285,23 @@ button {
   color: #6b4f32;
 }
 
+.panel-shell.theme-woven .wen-divider-line {
+  border-color: var(--woven-stitch);
+}
+
+.panel-shell.theme-woven .wen-divider-label {
+  background-color: var(--woven-linen);
+  color: var(--woven-muted);
+}
+
+.panel-shell.theme-woven .progress-hint-line {
+  color: var(--woven-muted);
+}
+
+.panel-shell.theme-woven .progress-hint-line span {
+  color: var(--woven-ink);
+}
+
 .panel-shell.theme-woven .woven-badge-count {
   background-color: #c17f59;
 }

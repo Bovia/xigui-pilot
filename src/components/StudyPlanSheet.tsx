@@ -1,216 +1,106 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { getProgress, loadPlan } from "../lib/api";
 import CloseButton from "./CloseButton";
 import PlanTableModal from "./PlanTableModal";
+import { buildPaceWeekDailyPlan, estimateFinishDate, paceStatus, todayIso } from "../lib/pacePlan";
+import { computeWenCatchUp, formatWenCatchUpLine } from "../lib/wenCatchUp";
 import {
-  buildWeekDailyPlan,
-  dynamicStatus,
-  todayIso,
-  type WeekDayRow,
-} from "../lib/dynamicPlan";
-import {
-  planVariantForView,
-  readPlanSheetView,
-  writePlanSheetView,
-} from "../lib/planSheetView";
-import type { LiveSession, PlanFile, PlanMilestone, PlanSheetView, PlanWeek } from "../lib/types";
-
-const PLAN_OPTIONS: Array<{
-  id: PlanSheetView;
-  label: string;
-  hint: string;
-}> = [
-  {
-    id: "overview",
-    label: "考纲优化版",
-    hint: "2024 大纲 · 16 周总览",
-  },
-  {
-    id: "wenOverview",
-    label: "文老师规划",
-    hint: "四阶段 · 60/30/10/2h",
-  },
-  {
-    id: "weekDaily",
-    label: "本周详细安排",
-    hint: "按进度动态 · 工作日逐日",
-  },
-];
-
-function formatRange(start: string, end: string) {
-  const s = new Date(`${start}T00:00:00`);
-  const e = new Date(`${end}T00:00:00`);
-  return `${s.getMonth() + 1}/${s.getDate()}–${e.getMonth() + 1}/${e.getDate()}`;
-}
+  PACE_HOURS_MAX,
+  PACE_HOURS_MIN,
+  PACE_HOURS_STEP,
+  PACE_PRESETS,
+  PACE_CHANGED_EVENT,
+  readDailyStudyHours,
+  writeDailyStudyHours,
+} from "../lib/studyPace";
+import type { PlanFile } from "../lib/types";
+import type { WeekDayRow } from "../lib/dynamicPlan";
 
 function formatDay(iso: string) {
   const d = new Date(`${iso}T00:00:00`);
   return `${d.getMonth() + 1}/${d.getDate()}`;
 }
 
-function phaseTone(phase: string) {
-  if (phase.includes("输入")) return "bg-sky-100 text-sky-700";
-  if (phase.includes("核心")) return "bg-violet-100 text-violet-700";
-  if (phase.includes("巩固")) return "bg-emerald-100 text-emerald-700";
-  if (phase.includes("输出")) return "bg-amber-100 text-amber-800";
-  if (phase.includes("冲刺")) return "bg-rose-100 text-rose-700";
-  return "bg-slate-100 text-slate-600";
-}
-
-function isLiveSoon(session: LiveSession, today: string) {
-  const diff =
-    (parseLocalMs(session.date) - parseLocalMs(today)) / (1000 * 60 * 60 * 24);
-  return diff >= 0 && diff <= 7;
-}
-
-function parseLocalMs(iso: string) {
-  return new Date(`${iso}T00:00:00`).getTime();
-}
-
-function formatLiveDate(iso: string) {
-  const d = new Date(`${iso}T00:00:00`);
-  return `${d.getMonth() + 1}/${d.getDate()}`;
-}
-
-function activeLiveSession(sessions: LiveSession[] | undefined, today: string) {
-  if (!sessions?.length) return null;
-  const upcoming = sessions.find((s) => s.date >= today);
-  return upcoming ?? sessions[sessions.length - 1];
-}
-
-function isWithinRange(today: string, start: string, end: string) {
-  return today >= start && today <= end;
-}
-
-function activeMilestone(milestones: PlanMilestone[] | undefined, today: string) {
-  return milestones?.find((m) => isWithinRange(today, m.start, m.end));
-}
-
-function formatProgressLine(st: ReturnType<typeof dynamicStatus>) {
+function formatProgressLine(st: ReturnType<typeof paceStatus>) {
   if (st.remaining === 0) return "已全部完成";
   if (st.nextLesson) return `${st.done}/${st.total} · 下节 ${st.nextLesson.no}`;
   return `${st.done}/${st.total}`;
 }
 
-const DEFAULT_REGISTRATION: PlanMilestone = {
-  id: "register",
-  title: "网上报名",
-  start: "2026-08-15",
-  end: "2026-09-05",
-  note: "中国计算机技术职业资格网 · 8月中旬至9月上旬，切勿错过",
-};
-
-function ChevronDownIcon({ open }: { open: boolean }) {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      className={`h-3.5 w-3.5 transition ${open ? "rotate-180" : ""}`}
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      aria-hidden
-    >
-      <path d="M6 9l6 6 6-6" />
-    </svg>
-  );
-}
-
 export default function StudyPlanSheet({
   open,
   onClose,
-  currentWeekId,
   daysToExam,
 }: {
   open: boolean;
   onClose: () => void;
-  currentWeekId?: string;
   daysToExam?: number;
 }) {
-  const [view, setView] = useState<PlanSheetView>(readPlanSheetView);
-  const [weeks, setWeeks] = useState<PlanWeek[]>([]);
-  const [liveSessions, setLiveSessions] = useState<LiveSession[]>([]);
-  const [examDate, setExamDate] = useState<string | null>(null);
-  const [milestones, setMilestones] = useState<PlanMilestone[]>([]);
+  const [savedHours, setSavedHours] = useState(readDailyStudyHours);
+  const [previewHours, setPreviewHours] = useState<number | null>(null);
   const [weekDaily, setWeekDaily] = useState<WeekDayRow[]>([]);
-  const [progressLine, setProgressLine] = useState<string>("");
+  const [examDate, setExamDate] = useState<string | null>(null);
+  const [progressLine, setProgressLine] = useState("");
+  const [finishDate, setFinishDate] = useState<string | null>(null);
+  const [wenCatchUpLine, setWenCatchUpLine] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [menuOpen, setMenuOpen] = useState(false);
   const [tableOpen, setTableOpen] = useState(false);
-  const menuRef = useRef<HTMLDivElement>(null);
-
-  const activeOption = PLAN_OPTIONS.find((o) => o.id === view) ?? PLAN_OPTIONS[0];
 
   const today = useMemo(() => todayIso(), [open]);
-
-  function isWithinRangeLocal(today: string, start: string, end: string) {
-    return today >= start && today <= end;
-  }
-
-  const registration = useMemo(() => {
-    const active = activeMilestone(milestones, today);
-    if (active) return active;
-    if (isWithinRangeLocal(today, DEFAULT_REGISTRATION.start, DEFAULT_REGISTRATION.end)) {
-      return DEFAULT_REGISTRATION;
-    }
-    return null;
-  }, [milestones, today]);
+  const activeHours = previewHours ?? savedHours;
+  const isPreview = previewHours != null && previewHours !== savedHours;
 
   useEffect(() => {
     if (!open) {
-      setMenuOpen(false);
       setTableOpen(false);
+      setPreviewHours(null);
       return;
     }
+    setSavedHours(readDailyStudyHours());
+  }, [open]);
+
+  useEffect(() => {
+    const onPace = () => setSavedHours(readDailyStudyHours());
+    window.addEventListener(PACE_CHANGED_EVENT, onPace);
+    return () => window.removeEventListener(PACE_CHANGED_EVENT, onPace);
+  }, []);
+
+  useEffect(() => {
+    if (!open) return;
     setLoading(true);
     setError(null);
-    const planVariant = planVariantForView(view);
-    Promise.all([loadPlan(planVariant) as Promise<PlanFile>, getProgress()])
-      .then(async ([plan, progress]) => {
-        setWeeks(plan.weeks ?? []);
-        setLiveSessions(plan.liveSessions ?? []);
+    Promise.all([
+      loadPlan("default") as Promise<PlanFile>,
+      loadPlan("wen") as Promise<PlanFile>,
+      getProgress(),
+    ])
+      .then(([plan, planWen, progress]) => {
         setExamDate(plan.examDate ?? null);
-        setMilestones(plan.milestones ?? [DEFAULT_REGISTRATION]);
-
-        const weekId = currentWeekId ?? plan.weeks?.[0]?.id ?? "W1";
-        if (view === "weekDaily") {
-          const v2 = (await loadPlan("v2")) as PlanFile;
-          setWeekDaily(buildWeekDailyPlan(v2, progress.videos, today, weekId));
-          const st = dynamicStatus(v2, progress.videos, today);
-          setProgressLine(formatProgressLine(st));
-        } else {
-          setWeekDaily([]);
-          const st = dynamicStatus(plan, progress.videos, today);
-          setProgressLine(formatProgressLine(st));
-        }
+        setWeekDaily(buildPaceWeekDailyPlan(plan, progress.videos, today, activeHours));
+        setFinishDate(estimateFinishDate(plan, progress.videos, today, activeHours));
+        setProgressLine(formatProgressLine(paceStatus(plan, progress.videos)));
+        const wenStatus = computeWenCatchUp(
+          plan,
+          planWen,
+          progress.videos,
+          today,
+          activeHours,
+        );
+        setWenCatchUpLine(formatWenCatchUpLine(wenStatus, formatDay));
       })
       .catch((e) => {
-        setWeeks([]);
         setWeekDaily([]);
         setError(e instanceof Error ? e.message : String(e));
       })
       .finally(() => setLoading(false));
-  }, [open, currentWeekId, today, view]);
+  }, [open, today, activeHours]);
 
-  useEffect(() => {
-    if (!menuOpen) return;
-    const onPointerDown = (e: PointerEvent) => {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
-        setMenuOpen(false);
-      }
-    };
-    document.addEventListener("pointerdown", onPointerDown);
-    return () => document.removeEventListener("pointerdown", onPointerDown);
-  }, [menuOpen]);
-
-  const switchView = (next: PlanSheetView) => {
-    setView(next);
-    setMenuOpen(false);
-    writePlanSheetView(next);
+  const commitHours = (hours: number) => {
+    writeDailyStudyHours(hours);
+    setSavedHours(hours);
+    setPreviewHours(null);
   };
-
-  const nextLive = view === "wenOverview" ? activeLiveSession(liveSessions, today) : null;
 
   if (!open) return null;
 
@@ -234,62 +124,9 @@ export default function StudyPlanSheet({
               </p>
             </div>
             <div className="flex shrink-0 items-center gap-1">
-              <div className="relative" ref={menuRef}>
-                <button
-                  type="button"
-                  onClick={() => setMenuOpen((v) => !v)}
-                  aria-haspopup="listbox"
-                  aria-expanded={menuOpen}
-                  aria-label="切换计划视图"
-                  title="切换视图"
-                  className={`study-plan-tool-btn flex items-center gap-0.5 rounded-lg border px-2 py-1 text-[11px] font-medium transition ${
-                    menuOpen
-                      ? "border-slate-300 bg-slate-100 text-slate-800"
-                      : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
-                  }`}
-                >
-                  <span className="max-w-[88px] truncate">{activeOption.label}</span>
-                  <ChevronDownIcon open={menuOpen} />
-                </button>
-                {menuOpen && (
-                  <div
-                    role="listbox"
-                    className="study-plan-menu absolute right-0 top-full z-40 mt-1 min-w-[196px] overflow-hidden rounded-xl border border-slate-200/80 bg-white py-1 shadow-lg"
-                  >
-                    {PLAN_OPTIONS.map((option) => {
-                      const selected = option.id === view;
-                      return (
-                        <button
-                          key={option.id}
-                          type="button"
-                          role="option"
-                          aria-selected={selected}
-                          onClick={() => switchView(option.id)}
-                          className={`w-full px-3 py-2 text-left transition ${
-                            selected ? "bg-blue-50" : "hover:bg-slate-50"
-                          }`}
-                        >
-                          <div
-                            className={`text-[12px] font-medium ${
-                              selected ? "text-blue-700" : "text-slate-800"
-                            }`}
-                          >
-                            {option.label}
-                            {selected && " ✓"}
-                          </div>
-                          <div className="mt-0.5 text-[10px] text-slate-500">{option.hint}</div>
-                        </button>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
               <button
                 type="button"
-                onClick={() => {
-                  setMenuOpen(false);
-                  setTableOpen(true);
-                }}
+                onClick={() => setTableOpen(true)}
                 title="表格视图（HTML）"
                 className="study-plan-tool-btn rounded-lg px-2 py-1 text-[11px] font-medium text-emerald-700 hover:bg-emerald-50"
               >
@@ -299,39 +136,60 @@ export default function StudyPlanSheet({
             </div>
           </div>
 
-          {nextLive && (
-            <div className="mb-3 rounded-xl border border-violet-200 bg-violet-50/80 px-3 py-2.5">
-              <div className="text-[12px] font-semibold text-violet-900">
-                直播第 {nextLive.no} 次 · {formatLiveDate(nextLive.date)} {nextLive.time}
-                {nextLive.date === today && (
-                  <span className="ml-1.5 rounded bg-violet-200 px-1.5 py-0.5 text-[9px] font-medium text-violet-800">
-                    今天
-                  </span>
-                )}
-                {isLiveSoon(nextLive, today) && nextLive.date !== today && (
-                  <span className="ml-1.5 rounded bg-violet-100 px-1.5 py-0.5 text-[9px] text-violet-700">
-                    本周
-                  </span>
-                )}
-              </div>
-              <p className="mt-0.5 text-[11px] leading-5 text-violet-800">{nextLive.title}</p>
-              {nextLive.format && (
-                <p className="mt-0.5 text-[10px] text-violet-600">{nextLive.format}</p>
+          <div className="mb-3 rounded-xl border border-slate-200/80 bg-slate-50/60 px-3 py-2.5">
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-[12px] font-medium text-slate-700">每天学习时长</span>
+              <span className="text-[12px] font-semibold tabular-nums text-slate-900">
+                {activeHours.toFixed(1)} 小时
+              </span>
+            </div>
+            <input
+              type="range"
+              min={PACE_HOURS_MIN}
+              max={PACE_HOURS_MAX}
+              step={PACE_HOURS_STEP}
+              value={activeHours}
+              onChange={(e) => setPreviewHours(Number(e.target.value))}
+              onPointerUp={() => {
+                if (previewHours != null) commitHours(previewHours);
+              }}
+              onKeyUp={(e) => {
+                if (e.key === "Enter" && previewHours != null) commitHours(previewHours);
+              }}
+              className="study-pace-slider mt-2 w-full"
+              aria-label="每天学习时长"
+            />
+            <div className="mt-2 flex flex-wrap items-center gap-1.5">
+              {PACE_PRESETS.map((preset) => (
+                <button
+                  key={preset.label}
+                  type="button"
+                  onClick={() => commitHours(preset.hours)}
+                  className={`rounded-lg px-2 py-0.5 text-[10px] font-medium transition ${
+                    savedHours === preset.hours && !isPreview
+                      ? "bg-blue-600 text-white"
+                      : "bg-white text-slate-600 ring-1 ring-slate-200 hover:bg-slate-50"
+                  }`}
+                >
+                  {preset.label} {preset.hours}h
+                </button>
+              ))}
+            </div>
+            <p className="mt-2 text-[10px] leading-5 text-slate-500">
+              {finishDate ? (
+                <>
+                  预计 <span className="font-medium text-slate-700">{formatDay(finishDate)}</span>{" "}
+                  刷完剩余录播
+                </>
+              ) : (
+                "录播已全部完成"
               )}
-            </div>
-          )}
-
-          {registration && (
-            <div className="mb-3 rounded-xl border border-amber-300 bg-amber-50 px-3 py-2.5">
-              <div className="text-[12px] font-semibold text-amber-900">
-                ⚠️ {registration.title}（{registration.start.replace(/-/g, "/")} –{" "}
-                {registration.end.replace(/-/g, "/")}）
-              </div>
-              <p className="mt-0.5 text-[11px] leading-5 text-amber-800">
-                {registration.note ?? "请尽快完成报名，避免错过本次考期。"}
-              </p>
-            </div>
-          )}
+              {isPreview && <span className="text-blue-600"> · 预览中</span>}
+            </p>
+            {wenCatchUpLine && (
+              <p className="mt-1 text-[10px] leading-5 text-violet-600">{wenCatchUpLine}</p>
+            )}
+          </div>
 
           {error && (
             <div className="mb-3 rounded-lg bg-rose-50 px-2 py-1.5 text-[11px] text-rose-700">
@@ -341,23 +199,32 @@ export default function StudyPlanSheet({
 
           {loading && <div className="py-6 text-center text-sm text-slate-500">加载中…</div>}
 
-          {!loading && view === "weekDaily" && (
+          {!loading && (
             <div className="space-y-2">
+              <p className="mb-2 text-[10px] leading-5 text-slate-400">
+                按每日时长动态排课 · 过去显示已学（划线 ✓）· 超额完成次日自动重算
+              </p>
               {weekDaily.map((row) => (
                 <div
                   key={row.date}
                   className={`study-plan-week-card rounded-xl border px-3 py-2.5 ${
                     row.isToday
                       ? "border-blue-300 bg-blue-50/60 ring-1 ring-blue-200"
-                      : row.isWeekend
-                        ? "border-dashed border-slate-200/80 bg-slate-50/50 opacity-75"
-                        : "border-slate-200/80 bg-white"
+                      : row.isPast
+                        ? "border-slate-200/60 bg-slate-50/40"
+                        : row.isWeekend
+                          ? "border-dashed border-slate-200/80 bg-slate-50/50 opacity-75"
+                          : "border-slate-200/80 bg-white"
                   }`}
                 >
                   <div className="flex items-start gap-2">
                     <span
                       className={`mt-0.5 shrink-0 rounded-md px-1.5 py-0.5 text-[10px] font-semibold tabular-nums ${
-                        row.isToday ? "bg-blue-600 text-white" : "bg-slate-100 text-slate-600"
+                        row.isToday
+                          ? "bg-blue-600 text-white"
+                          : row.isPast
+                            ? "bg-slate-200 text-slate-500"
+                            : "bg-slate-100 text-slate-600"
                       }`}
                     >
                       周{row.weekday}
@@ -370,6 +237,11 @@ export default function StudyPlanSheet({
                         {row.isToday && (
                           <span className="rounded bg-blue-100 px-1.5 py-0.5 text-[9px] font-medium text-blue-700">
                             今天
+                          </span>
+                        )}
+                        {row.isPast && row.lessons.length > 0 && (
+                          <span className="text-[9px] text-slate-400">
+                            {row.lessons.every((l) => l.done) ? "已学完" : "已学"}
                           </span>
                         )}
                         {row.isWeekend && (
@@ -390,6 +262,11 @@ export default function StudyPlanSheet({
                           >
                             [{l.lessonNo}] {l.title}
                             {l.done && " ✓"}
+                            {!l.done && l.inProgress && (
+                              <span className="ml-1 text-[10px] font-normal text-amber-600">
+                                续播
+                              </span>
+                            )}
                           </div>
                         ))
                       ) : (
@@ -401,75 +278,6 @@ export default function StudyPlanSheet({
               ))}
             </div>
           )}
-
-          {!loading && (view === "overview" || view === "wenOverview") && (
-            <div className="space-y-2">
-              {weeks.map((week) => {
-                const isCurrent = week.id === currentWeekId;
-                const isRegisterWeek = week.id === "W6" || week.id === "W7";
-                return (
-                  <div
-                    key={week.id}
-                    className={`study-plan-week-card rounded-xl border px-3 py-2.5 ${
-                      isCurrent
-                        ? "border-blue-300 bg-blue-50/60 ring-1 ring-blue-200"
-                        : isRegisterWeek && registration
-                          ? "border-amber-200 bg-amber-50/40"
-                          : "border-slate-200/80 bg-white"
-                    }`}
-                  >
-                    <div className="flex items-start gap-2">
-                      <span
-                        className={`mt-0.5 shrink-0 rounded-md px-1.5 py-0.5 text-[10px] font-semibold tabular-nums ${
-                          isCurrent ? "bg-blue-600 text-white" : "bg-slate-100 text-slate-600"
-                        }`}
-                      >
-                        {week.id}
-                      </span>
-                      <div className="min-w-0 flex-1">
-                        <div className="flex flex-wrap items-center gap-1.5">
-                          <span className="text-[11px] tabular-nums text-slate-500">
-                            {formatRange(week.start, week.end)}
-                          </span>
-                          <span
-                            className={`rounded px-1.5 py-0.5 text-[9px] font-medium ${phaseTone(week.phase)}`}
-                          >
-                            {week.phase}
-                          </span>
-                          {week.stage && (
-                            <span className="text-[9px] text-slate-400">{week.stage}</span>
-                          )}
-                          {isCurrent && (
-                            <span className="rounded bg-blue-100 px-1.5 py-0.5 text-[9px] font-medium text-blue-700">
-                              本周
-                            </span>
-                          )}
-                          {isRegisterWeek && registration && (
-                            <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[9px] font-medium text-amber-800">
-                              报考
-                            </span>
-                          )}
-                        </div>
-                        <div className="mt-1 text-[12px] font-medium leading-5 text-slate-800">
-                          {week.focus}
-                        </div>
-                        {week.caseArrangement && week.caseArrangement !== "—" && (
-                          <div className="mt-0.5 text-[10px] text-slate-500">
-                            案例/论文：{week.caseArrangement}
-                          </div>
-                        )}
-                        {week.tasks && week.tasks.length > 0 && (
-                          <div className="mt-0.5 text-[10px] text-slate-400">
-                            本周 {week.tasks.length} 节视频
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
         </div>
       </div>
 
@@ -479,10 +287,9 @@ export default function StudyPlanSheet({
         title="2026 学习计划表"
         examDate={examDate}
         daysToExam={daysToExam}
-        viewLabel={activeOption.label}
-        weeks={weeks}
-        weekDaily={view === "weekDaily" ? weekDaily : undefined}
-        currentWeekId={currentWeekId}
+        viewLabel="动态逐日安排"
+        weeks={[]}
+        weekDaily={weekDaily}
       />
     </>
   );

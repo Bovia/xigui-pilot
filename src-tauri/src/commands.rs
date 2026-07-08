@@ -487,6 +487,42 @@ pub fn set_textbook_dir(app: AppHandle, textbook_dir: String) -> Result<Settings
     Ok(settings)
 }
 
+fn normalize_tricolor_notes_dir(raw: &str, default_subdir: &str) -> String {
+    let path = Path::new(raw.trim());
+    if !path.exists() {
+        return raw.to_string();
+    }
+    if path
+        .file_name()
+        .is_some_and(|n| n.to_string_lossy() == default_subdir)
+    {
+        return path.to_string_lossy().to_string();
+    }
+    let nested = path.join(default_subdir);
+    if nested.is_dir() {
+        return nested.to_string_lossy().to_string();
+    }
+    path.to_string_lossy().to_string()
+}
+
+#[tauri::command]
+pub fn set_tricolor_notes_dir(app: AppHandle, tricolor_notes_dir: String) -> Result<Settings, String> {
+    let raw = tricolor_notes_dir.trim();
+    let path = Path::new(raw);
+    if !path.is_dir() {
+        return Err("请选择三色笔记文件夹".into());
+    }
+    let textbook = load_textbook()?;
+    let subdir = textbook
+        .get("tricolorNotesSubdir")
+        .and_then(|v| v.as_str())
+        .unwrap_or("第2版 教材三色笔记");
+    let (settings_path, mut settings) = settings_for(&app)?;
+    settings.tricolor_notes_dir = Some(normalize_tricolor_notes_dir(raw, subdir));
+    settings.save(&settings_path)?;
+    Ok(settings)
+}
+
 #[tauri::command]
 pub fn prepare_dialog(app: AppHandle) {
     set_panel_hide_suppressed(&app, true);
@@ -559,7 +595,14 @@ pub fn save_video_progress(
     duration: f64,
 ) -> Result<VideoProgress, String> {
     let (path, mut progress) = progress_for(&app)?;
-    let completed = duration > 0.0 && position / duration >= 0.9;
+    let key = lesson_no.to_string();
+    let was_completed = progress
+        .videos
+        .get(&key)
+        .map(|v| v.completed)
+        .unwrap_or(false);
+    let reached = duration > 0.0 && position / duration >= 0.9;
+    let completed = was_completed || reached;
     let today = today_string();
     let entry = VideoProgress {
         position,
@@ -1084,6 +1127,75 @@ pub fn open_textbook(app: AppHandle, lesson_no: u32) -> Result<TextbookOpenResul
     Ok(TextbookOpenResult {
         path: path.to_string_lossy().to_string(),
         page,
+    })
+}
+
+fn lesson_chapter_no(title: &str) -> Option<u32> {
+    let compact: String = title.chars().filter(|c| !c.is_whitespace()).collect();
+    if compact.starts_with('0') {
+        return None;
+    }
+    if let Some(dot) = compact.find('.') {
+        if let Ok(ch) = compact[..dot].parse::<u32>() {
+            if ch > 0 {
+                return Some(ch);
+            }
+        }
+    }
+    None
+}
+
+fn resolve_tricolor_notes_path(app: &AppHandle, chapter: u32) -> Result<PathBuf, String> {
+    let settings = settings_for(app)?.1;
+    let textbook = load_textbook()?;
+    let subdir = textbook
+        .get("tricolorNotesSubdir")
+        .and_then(|v| v.as_str())
+        .unwrap_or("第2版 教材三色笔记");
+    let template = textbook
+        .get("tricolorNotesFilenameTemplate")
+        .and_then(|v| v.as_str())
+        .unwrap_or("《系统规划与管理师教程》第2版-三色笔记-第{chapter}章.pdf");
+    let filename = template.replace("{chapter}", &chapter.to_string());
+
+    let dir = if let Some(stored) = settings.tricolor_notes_dir.as_deref() {
+        PathBuf::from(stored)
+    } else if let Some(root) = settings.root_dir.as_deref() {
+        Path::new(root).join(subdir)
+    } else {
+        return Err("请先选择三色笔记文件夹".into());
+    };
+
+    let path = dir.join(&filename);
+    if !path.exists() {
+        return Err(format!("三色笔记 PDF 不存在: {}", path.display()));
+    }
+    Ok(path)
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct TricolorNotesOpenResult {
+    pub path: String,
+    pub chapter: Option<u32>,
+}
+
+#[tauri::command]
+pub fn open_tricolor_notes(app: AppHandle, lesson_no: u32) -> Result<TricolorNotesOpenResult, String> {
+    activate_for_action(&app);
+    let plan = load_plan_for(&app)?;
+    let title = plan
+        .get("lessons")
+        .and_then(|v| v.get(lesson_no.to_string()))
+        .and_then(|v| v.get("title"))
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+    let chapter = lesson_chapter_no(title).ok_or("该课节暂无对应三色笔记章节")?;
+    let path = resolve_tricolor_notes_path(&app, chapter)?;
+    open_pdf_in_preview(&path, None)?;
+    Ok(TricolorNotesOpenResult {
+        path: path.to_string_lossy().to_string(),
+        chapter: Some(chapter),
     })
 }
 

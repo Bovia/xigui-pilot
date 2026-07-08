@@ -40,6 +40,7 @@ export default function HelpGuide({ open, quizName, onClose }: Props) {
             <ol className="list-decimal space-y-1 pl-4">
               <li>设置 → 选择资料目录（如 Desktop/系规）</li>
               <li>设置 → 选择教材 PDF（官方带书签版）</li>
+              <li>设置 → 选择三色笔记文件夹（每章一个 PDF）</li>
             </ol>
           </section>
 
@@ -52,7 +53,7 @@ export default function HelpGuide({ open, quizName, onClose }: Props) {
               </li>
               <li>
                 <span className="font-medium text-amber-600">书</span>
-                ：Preview 打开教材并跳到对应页（页码来自 PDF 书签）
+                ：点击「书」选官方教材（Preview 跳页）或三色笔记（按章打开 PDF；导学课无对应章节）
               </li>
               <li>
                 <span className="font-medium text-emerald-600">题</span>

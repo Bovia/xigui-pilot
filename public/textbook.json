@@ -1,6 +1,8 @@
 {
   "textbookSubdir": "03：官方教材",
   "textbookFilename": "【带书签可搜索】系统规划与管理师（第2版）.pdf",
+  "tricolorNotesSubdir": "第2版 教材三色笔记",
+  "tricolorNotesFilenameTemplate": "《系统规划与管理师教程》第2版-三色笔记-第{chapter}章.pdf",
   "lessons": {
     "3": {
       "page": 18

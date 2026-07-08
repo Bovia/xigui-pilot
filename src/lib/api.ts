@@ -14,6 +14,9 @@ export const setRootDir = (rootDir: string) =>
 export const setTextbookDir = (textbookDir: string) =>
   invoke<Settings>("set_textbook_dir", { textbookDir });
 
+export const setTricolorNotesDir = (tricolorNotesDir: string) =>
+  invoke<Settings>("set_tricolor_notes_dir", { tricolorNotesDir });
+
 /** 非阻塞选目录，避免 Rust blocking 对话框卡死主线程 */
 export async function pickRootDir(): Promise<Settings | null> {
   await invoke("prepare_dialog");
@@ -75,6 +78,42 @@ export async function pickTextbook(
   return settings;
 }
 
+/** 选择三色笔记文件夹（每章一个 PDF） */
+export async function pickTricolorNotes(
+  hintRoot?: string | null,
+): Promise<Settings | null> {
+  await invoke("prepare_dialog");
+
+  let subdir = "第2版 教材三色笔记";
+  try {
+    const tb = await loadTextbook();
+    subdir = tb.tricolorNotesSubdir || subdir;
+  } catch {
+    /* use defaults */
+  }
+
+  const defaultPath = hintRoot
+    ? `${hintRoot}/${subdir}`
+    : `${await homeDir()}/Desktop/系规/${subdir}`;
+
+  const selected = await open({
+    directory: true,
+    multiple: false,
+    title: "选择三色笔记文件夹",
+    defaultPath,
+  });
+
+  if (selected === null) {
+    await invoke("finish_dialog");
+    return null;
+  }
+
+  const path = Array.isArray(selected) ? selected[0] : selected;
+  const settings = await setTricolorNotesDir(path);
+  await invoke("finish_dialog");
+  return settings;
+}
+
 export const getPanelPinned = () => invoke<boolean>("get_panel_pinned");
 
 export const setPanelPinned = (pinned: boolean) =>
@@ -120,6 +159,9 @@ export const openExternalVideo = (lessonNo: number) =>
 
 export const openTextbook = (lessonNo: number) =>
   invoke<{ path: string; page?: number }>("open_textbook", { lessonNo });
+
+export const openTricolorNotes = (lessonNo: number) =>
+  invoke<{ path: string; chapter?: number }>("open_tricolor_notes", { lessonNo });
 
 export const openQuiz = (lessonNo: number) =>
   invoke<{
