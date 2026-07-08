@@ -1,0 +1,391 @@
+{
+  "examDate": "2026-10-24",
+  "startDate": "2026-06-16",
+  "videoSubdir": "01：基础课视频（已完结）",
+  "videoSources": [
+    {
+      "subdir": "01：基础课视频（已完结）",
+      "category": "basic",
+      "mode": "filename"
+    },
+    {
+      "subdir": "02：案例、论文专题（26.10录播课）",
+      "category": "special",
+      "mode": "sequential",
+      "startNo": 901
+    }
+  ],
+  "lessons": {},
+  "planId": "wen-teacher",
+  "planName": "文老师四阶段规划（60/30/10/2h）",
+  "version": 1,
+  "milestones": [
+    {
+      "id": "register",
+      "title": "网上报名",
+      "start": "2026-08-15",
+      "end": "2026-09-05",
+      "note": "中国计算机技术职业资格网（ruankao.org.cn）· 8月中旬至9月上旬，切勿错过"
+    }
+  ],
+  "liveSessions": [
+    {
+      "no": 1,
+      "title": "导学开班 + 第1～3章",
+      "date": "2026-06-16",
+      "time": "20:00",
+      "format": "直播",
+      "chapterHint": "信息系统与信息技术发展、数字中国、哲学方法论"
+    },
+    {
+      "no": 2,
+      "title": "信息系统规划",
+      "date": "2026-06-23",
+      "time": "20:00",
+      "format": "串讲+真题+案例",
+      "chapterHint": "第4章"
+    },
+    {
+      "no": 3,
+      "title": "应用系统规划",
+      "date": "2026-06-30",
+      "time": "20:00",
+      "format": "串讲+真题+案例",
+      "chapterHint": "第5章"
+    },
+    {
+      "no": 4,
+      "title": "云资源规划 + 网络环境规划",
+      "date": "2026-07-07",
+      "time": "20:00",
+      "format": "串讲+真题+案例",
+      "chapterHint": "第6～7章"
+    },
+    {
+      "no": 5,
+      "title": "数据资源规划 + 信息安全规划",
+      "date": "2026-07-14",
+      "time": "20:00",
+      "format": "串讲+真题+案例",
+      "chapterHint": "第8～9章"
+    },
+    {
+      "no": 6,
+      "title": "云原生系统规划 + 信息系统治理",
+      "date": "2026-07-21",
+      "time": "20:00",
+      "format": "串讲+真题+案例",
+      "chapterHint": "第10～11章"
+    },
+    {
+      "no": 7,
+      "title": "信息系统服务管理",
+      "date": "2026-07-28",
+      "time": "20:00",
+      "format": "串讲+真题+案例",
+      "chapterHint": "第12章"
+    },
+    {
+      "no": 8,
+      "title": "人员管理",
+      "date": "2026-08-04",
+      "time": "20:00",
+      "format": "串讲+真题+案例",
+      "chapterHint": "第13章"
+    },
+    {
+      "no": 9,
+      "title": "规范与过程管理 + 技术与研发管理",
+      "date": "2026-08-11",
+      "time": "20:00",
+      "format": "串讲+真题+案例",
+      "chapterHint": "第14～15章"
+    },
+    {
+      "no": 10,
+      "title": "资源与工具管理 + 信息系统项目管理",
+      "date": "2026-08-18",
+      "time": "20:00",
+      "format": "串讲+真题+案例",
+      "chapterHint": "第16～17章"
+    },
+    {
+      "no": 11,
+      "title": "智慧城市 + 智慧园区发展规划",
+      "date": "2026-08-25",
+      "time": "20:00",
+      "format": "直播",
+      "chapterHint": "第18～19章"
+    },
+    {
+      "no": 12,
+      "title": "论文写作1：注意事项 + 万能模板",
+      "date": "2026-09-01",
+      "time": "20:00",
+      "format": "直播",
+      "chapterHint": "论文"
+    }
+  ],
+  "weeks": [
+    {
+      "id": "W1",
+      "stage": "基础",
+      "phase": "阶段一·全面复习",
+      "focus": "导学 + 第1章 信息系统与信息技术发展（★★·选择题）",
+      "caseArrangement": "—",
+      "start": "2026-07-07",
+      "end": "2026-07-13",
+      "tasks": [
+        { "id": "wen-w1-01", "type": "video", "lessonNo": 1, "title": "0系规第二版导学1—考试介绍—考点分析", "scheduledDate": "2026-07-07", "missing": false },
+        { "id": "wen-w1-02", "type": "video", "lessonNo": 2, "title": "0系规第二版导学2—备考规划—学习方法", "scheduledDate": "2026-07-07", "missing": false },
+        { "id": "wen-w1-03", "type": "video", "lessonNo": 3, "title": "1.1信息系统与信息技术发展—信息化与信息系统内涵", "scheduledDate": "2026-07-08", "missing": false },
+        { "id": "wen-w1-04", "type": "video", "lessonNo": 4, "title": "1.2信息系统与信息技术发展—信息系统结构VS诺兰模型", "scheduledDate": "2026-07-08", "missing": false },
+        { "id": "wen-w1-05", "type": "video", "lessonNo": 5, "title": "1.3信息技术及其发展—计算机软硬件VS计算机网络", "scheduledDate": "2026-07-09", "missing": false },
+        { "id": "wen-w1-06", "type": "video", "lessonNo": 6, "title": "1.4信息系统与信息技术发展—数据存储技术", "scheduledDate": "2026-07-09", "missing": false },
+        { "id": "wen-w1-07", "type": "video", "lessonNo": 7, "title": "1.5信息系统与信息技术发展—信息安全", "scheduledDate": "2026-07-10", "missing": false },
+        { "id": "wen-w1-08", "type": "video", "lessonNo": 8, "title": "1.6信息系统与信息技术发展—新一代信息技术—物联网VS区块链", "scheduledDate": "2026-07-10", "missing": false },
+        { "id": "wen-w1-09", "type": "video", "lessonNo": 9, "title": "1.7信息系统与信息技术发展—新一代信息技术—云计算VS大数据", "scheduledDate": "2026-07-11", "missing": false },
+        { "id": "wen-w1-10", "type": "video", "lessonNo": 10, "title": "1.8信息系统与信息技术发展—新一代信息技术—人工智能VS数字孪生等", "scheduledDate": "2026-07-11", "missing": false }
+      ]
+    },
+    {
+      "id": "W2",
+      "stage": "基础",
+      "phase": "阶段一·全面复习",
+      "focus": "第2章 数字中国与数智化发展（★） + 第3章 科学与哲学方法论（★）",
+      "caseArrangement": "—",
+      "start": "2026-07-14",
+      "end": "2026-07-20",
+      "tasks": [
+        { "id": "wen-w2-11", "type": "video", "lessonNo": 11, "title": "2.1数字中国与数智化发展—数字化转型VS数字中国概述", "scheduledDate": "2026-07-14", "missing": false },
+        { "id": "wen-w2-12", "type": "video", "lessonNo": 12, "title": "2.2数字中国与数智化发展—数字经济", "scheduledDate": "2026-07-14", "missing": false },
+        { "id": "wen-w2-13", "type": "video", "lessonNo": 13, "title": "2.3数字中国与数智化发展—数字生态VS数智化发展等", "scheduledDate": "2026-07-15", "missing": false },
+        { "id": "wen-w2-14", "type": "video", "lessonNo": 14, "title": "3.1系统科学与哲学方法论—矛盾论VS实践论", "scheduledDate": "2026-07-16", "missing": false },
+        { "id": "wen-w2-15", "type": "video", "lessonNo": 15, "title": "3.2系统科学与哲学方法论—系统论VS信息论", "scheduledDate": "2026-07-17", "missing": false },
+        { "id": "wen-w2-16", "type": "video", "lessonNo": 16, "title": "3.3系统科学与哲学方法论—控制论VS耗散论", "scheduledDate": "2026-07-18", "missing": false },
+        { "id": "wen-w2-17", "type": "video", "lessonNo": 17, "title": "3.4系统科学与哲学方法论—协同论VS复杂系统论", "scheduledDate": "2026-07-19", "missing": false }
+      ]
+    },
+    {
+      "id": "W3",
+      "stage": "方法",
+      "phase": "阶段一·全面复习",
+      "focus": "第4章 信息系统规划（★★★） + 第5章 应用系统规划（★★★）",
+      "caseArrangement": "课后习题刷到90%+",
+      "start": "2026-07-21",
+      "end": "2026-07-27",
+      "tasks": [
+        { "id": "wen-w3-18", "type": "video", "lessonNo": 18, "title": "4.1信息系统规划—概述", "scheduledDate": "2026-07-21", "missing": false },
+        { "id": "wen-w3-19", "type": "video", "lessonNo": 19, "title": "4.2信息系统规划主要内容", "scheduledDate": "2026-07-21", "missing": false },
+        { "id": "wen-w3-20", "type": "video", "lessonNo": 20, "title": "4.3信息系统规划工作要点", "scheduledDate": "2026-07-22", "missing": false },
+        { "id": "wen-w3-21", "type": "video", "lessonNo": 21, "title": "4.4信息系统规划常用方法", "scheduledDate": "2026-07-22", "missing": false },
+        { "id": "wen-w3-22", "type": "video", "lessonNo": 22, "title": "5.1应用系统规划—概述", "scheduledDate": "2026-07-23", "missing": false },
+        { "id": "wen-w3-23", "type": "video", "lessonNo": 23, "title": "5.2应用系统规划—主要内容1", "scheduledDate": "2026-07-24", "missing": false },
+        { "id": "wen-w3-24", "type": "video", "lessonNo": 24, "title": "5.3应用系统规划—主要内容2", "scheduledDate": "2026-07-25", "missing": false },
+        { "id": "wen-w3-25", "type": "video", "lessonNo": 25, "title": "5.4 应用系统规划-主要过程", "scheduledDate": "2026-07-25", "missing": false },
+        { "id": "wen-w3-26", "type": "video", "lessonNo": 26, "title": "5.5应用系统规划-主要方法和软件工厂", "scheduledDate": "2026-07-26", "missing": false }
+      ]
+    },
+    {
+      "id": "W4",
+      "stage": "方法",
+      "phase": "阶段一·全面复习",
+      "focus": "第6章 云资源规划（★★★） + 第7章 网络环境规划（★★★）",
+      "caseArrangement": "课后习题刷到90%+",
+      "start": "2026-07-28",
+      "end": "2026-08-03",
+      "tasks": [
+        { "id": "wen-w4-27", "type": "video", "lessonNo": 27, "title": "6.1 云资源规划-概述VS体系架构", "scheduledDate": "2026-07-28", "missing": false },
+        { "id": "wen-w4-28", "type": "video", "lessonNo": 28, "title": "6.2 云资源规划-计算资源规划VS存储资源规划", "scheduledDate": "2026-07-28", "missing": false },
+        { "id": "wen-w4-29", "type": "video", "lessonNo": 29, "title": "6.3 云资源规划-云数据中心规划", "scheduledDate": "2026-07-29", "missing": false },
+        { "id": "wen-w4-30", "type": "video", "lessonNo": 30, "title": "7.1 网络环境规划-网络架构主要技术1", "scheduledDate": "2026-07-30", "missing": false },
+        { "id": "wen-w4-31", "type": "video", "lessonNo": 31, "title": "7.2 网络资源规划-网络架构主要技术2", "scheduledDate": "2026-07-30", "missing": false },
+        { "id": "wen-w4-32", "type": "video", "lessonNo": 32, "title": "7.3 网络资源规划-广域网规划", "scheduledDate": "2026-07-31", "missing": false },
+        { "id": "wen-w4-33", "type": "video", "lessonNo": 33, "title": "7.4 网络资源规划-局域网和无线网规划", "scheduledDate": "2026-07-31", "missing": false },
+        { "id": "wen-w4-34", "type": "video", "lessonNo": 34, "title": "7.5 网络资源规划-网络整体规划的重点事项", "scheduledDate": "2026-08-01", "missing": false }
+      ]
+    },
+    {
+      "id": "W5",
+      "stage": "方法",
+      "phase": "阶段一·全面复习",
+      "focus": "第8章 数据资源规划（★★★） + 第9章 信息安全规划（★★★）",
+      "caseArrangement": "课后习题刷到90%+",
+      "start": "2026-08-04",
+      "end": "2026-08-10",
+      "tasks": [
+        { "id": "wen-w5-35", "type": "video", "lessonNo": 35, "title": "8.1 数据资源规划-概述vs数据资源规划方法", "scheduledDate": "2026-08-04", "missing": true },
+        { "id": "wen-w5-36", "type": "video", "lessonNo": 36, "title": "8.2 数据资源规划-数据架构", "scheduledDate": "2026-08-05", "missing": false },
+        { "id": "wen-w5-37", "type": "video", "lessonNo": 37, "title": "8.3 数据资源规划-数据标准化", "scheduledDate": "2026-08-06", "missing": false },
+        { "id": "wen-w5-38", "type": "video", "lessonNo": 38, "title": "9.1 信息安全规划-概述", "scheduledDate": "2026-08-07", "missing": false },
+        { "id": "wen-w5-39", "type": "video", "lessonNo": 39, "title": "9.2 信息安全规划-安全架构和信息安全规划内容", "scheduledDate": "2026-08-08", "missing": false }
+      ]
+    },
+    {
+      "id": "W6",
+      "stage": "方法",
+      "phase": "阶段一·全面复习",
+      "focus": "第10章 云原生系统规划（★★★） + 第11章 信息系统治理（★★★） · ⚠️ 报名窗口已开",
+      "caseArrangement": "⚠️ 报名",
+      "start": "2026-08-11",
+      "end": "2026-08-17",
+      "tasks": [
+        { "id": "wen-w6-40", "type": "video", "lessonNo": 40, "title": "10.1 云原生系统规划-云原生发展背景", "scheduledDate": "2026-08-11", "missing": false },
+        { "id": "wen-w6-41", "type": "video", "lessonNo": 41, "title": "10.2 云原生系统规划-云原生技术架构", "scheduledDate": "2026-08-11", "missing": false },
+        { "id": "wen-w6-42", "type": "video", "lessonNo": 42, "title": "10.3 元原生系统规划-云原生建设规划", "scheduledDate": "2026-08-12", "missing": false },
+        { "id": "wen-w6-43", "type": "video", "lessonNo": 43, "title": "11.1 信息系统治理-IT治理", "scheduledDate": "2026-08-13", "missing": false },
+        { "id": "wen-w6-44", "type": "video", "lessonNo": 44, "title": "11.2 信息系统治理-IT审计1", "scheduledDate": "2026-08-14", "missing": false },
+        { "id": "wen-w6-45", "type": "video", "lessonNo": 45, "title": "11.3 信息系统治理-IT审计2", "scheduledDate": "2026-08-15", "missing": false }
+      ]
+    },
+    {
+      "id": "W7",
+      "stage": "能力",
+      "phase": "阶段一·全面复习",
+      "focus": "第12章 信息系统服务管理（★★★·ITIL/ITSS核心） · ⚠️ 务必完成报名",
+      "caseArrangement": "⚠️ 报名确认",
+      "start": "2026-08-18",
+      "end": "2026-08-24",
+      "tasks": [
+        { "id": "wen-w7-46", "type": "video", "lessonNo": 46, "title": "12.1 信息系统服务管理-服务战略规划", "scheduledDate": "2026-08-18", "missing": false },
+        { "id": "wen-w7-47", "type": "video", "lessonNo": 47, "title": "12.2 信息系统服务管理-服务设计实现01", "scheduledDate": "2026-08-18", "missing": false },
+        { "id": "wen-w7-48", "type": "video", "lessonNo": 48, "title": "12.3 信息系统服务管理-服务设计实现02", "scheduledDate": "2026-08-19", "missing": false },
+        { "id": "wen-w7-49", "type": "video", "lessonNo": 49, "title": "12.4 信息系统服务管理-服务运营提升", "scheduledDate": "2026-08-20", "missing": false },
+        { "id": "wen-w7-50", "type": "video", "lessonNo": 50, "title": "12.5 信息系统服务管理-服务退役终止", "scheduledDate": "2026-08-21", "missing": false },
+        { "id": "wen-w7-51", "type": "video", "lessonNo": 51, "title": "12.6 信息系统服务管理-持续改进与监督", "scheduledDate": "2026-08-22", "missing": false }
+      ]
+    },
+    {
+      "id": "W8",
+      "stage": "能力",
+      "phase": "阶段一·全面复习",
+      "focus": "第13章 人员管理 + 第14章 规范与过程管理（★★★）",
+      "caseArrangement": "课后习题刷到90%+",
+      "start": "2026-08-25",
+      "end": "2026-08-31",
+      "tasks": [
+        { "id": "wen-w8-52", "type": "video", "lessonNo": 52, "title": "13.1 人员管理-工作分析", "scheduledDate": "2026-08-25", "missing": false },
+        { "id": "wen-w8-53", "type": "video", "lessonNo": 53, "title": "13.2 人员管理-岗位设计", "scheduledDate": "2026-08-25", "missing": false },
+        { "id": "wen-w8-54", "type": "video", "lessonNo": 54, "title": "13.3 人员管理-人力资源战略与计划", "scheduledDate": "2026-08-26", "missing": false },
+        { "id": "wen-w8-55", "type": "video", "lessonNo": 55, "title": "13.4 人员管理-人员招聘与录用", "scheduledDate": "2026-08-26", "missing": false },
+        { "id": "wen-w8-56", "type": "video", "lessonNo": 56, "title": "13.5 人员管理-人员培训与绩效管理", "scheduledDate": "2026-08-27", "missing": false },
+        { "id": "wen-w8-57", "type": "video", "lessonNo": 57, "title": "13.6 人员管理-薪酬管理VS职业规划", "scheduledDate": "2026-08-27", "missing": false },
+        { "id": "wen-w8-58", "type": "video", "lessonNo": 58, "title": "14.1 规范与过程管理-管理标准化", "scheduledDate": "2026-08-28", "missing": false },
+        { "id": "wen-w8-59", "type": "video", "lessonNo": 59, "title": "14.2 规范与过程管理-流程规划和执行", "scheduledDate": "2026-08-29", "missing": false },
+        { "id": "wen-w8-60", "type": "video", "lessonNo": 60, "title": "14.3 规范与过程管理-流程评价与持续改进", "scheduledDate": "2026-08-29", "missing": false }
+      ]
+    },
+    {
+      "id": "W9",
+      "stage": "能力",
+      "phase": "阶段一·全面复习",
+      "focus": "第15章 技术与研发 + 第16章 资源与工具 + 第17章 项目管理（★★★）",
+      "caseArrangement": "课后习题刷到90%+",
+      "start": "2026-09-01",
+      "end": "2026-09-07",
+      "tasks": [
+        { "id": "wen-w9-61", "type": "video", "lessonNo": 61, "title": "15.1 技术与研发管理-技术研发管理", "scheduledDate": "2026-09-01", "missing": false },
+        { "id": "wen-w9-62", "type": "video", "lessonNo": 62, "title": "15.2 技术与研发管理-技术研发应用", "scheduledDate": "2026-09-01", "missing": false },
+        { "id": "wen-w9-63", "type": "video", "lessonNo": 63, "title": "15.3 技术与研发管理-知识产权管理", "scheduledDate": "2026-09-02", "missing": false },
+        { "id": "wen-w9-64", "type": "video", "lessonNo": 64, "title": "16.1 资源与工具管理-研发与测试管理", "scheduledDate": "2026-09-03", "missing": false },
+        { "id": "wen-w9-65", "type": "video", "lessonNo": 65, "title": "16.2 资源与工具管理-运维工具", "scheduledDate": "2026-09-04", "missing": true },
+        { "id": "wen-w9-66", "type": "video", "lessonNo": 66, "title": "16.3 资源与工具管理-项目管理工具", "scheduledDate": "2026-09-04", "missing": true },
+        { "id": "wen-w9-67", "type": "video", "lessonNo": 67, "title": "17.1 信息系统项目管理-项目基本要素", "scheduledDate": "2026-09-05", "missing": true },
+        { "id": "wen-w9-68", "type": "video", "lessonNo": 68, "title": "17.2 信息系统项目管理-项目经理角色", "scheduledDate": "2026-09-05", "missing": true },
+        { "id": "wen-w9-69", "type": "video", "lessonNo": 69, "title": "17.3 信息系统项目管理-价值驱动的项目管理知识体系", "scheduledDate": "2026-09-06", "missing": false }
+      ]
+    },
+    {
+      "id": "W10",
+      "stage": "实践",
+      "phase": "阶段一·全面复习",
+      "focus": "第18-24章 实践篇速览（★★·选择+案例背景）",
+      "caseArrangement": "课后习题刷到90%+",
+      "start": "2026-09-08",
+      "end": "2026-09-14",
+      "tasks": [
+        { "id": "wen-w10-70", "type": "video", "lessonNo": 70, "title": "18.1 智慧城市发展规划-发展整体环境和发展关注焦点", "scheduledDate": "2026-09-08", "missing": false },
+        { "id": "wen-w10-71", "type": "video", "lessonNo": 71, "title": "18.2 智慧城市规划-规划要点和系统架构", "scheduledDate": "2026-09-08", "missing": false },
+        { "id": "wen-w10-72", "type": "video", "lessonNo": 72, "title": "19.1 智慧园区发展规划-发展宏观环境和发展关键点", "scheduledDate": "2026-09-09", "missing": false },
+        { "id": "wen-w10-73", "type": "video", "lessonNo": 73, "title": "19.2 智慧园区发展规划-发展规划要点和案例", "scheduledDate": "2026-09-09", "missing": false },
+        { "id": "wen-w10-74", "type": "video", "lessonNo": 74, "title": "20.1 数字乡村发展规划-发展环境VS发展关键焦点", "scheduledDate": "2026-09-10", "missing": false },
+        { "id": "wen-w10-75", "type": "video", "lessonNo": 75, "title": "20.2 数字乡村发展规划-发展规划要点VS主要架构", "scheduledDate": "2026-09-10", "missing": false },
+        { "id": "wen-w10-76", "type": "video", "lessonNo": 76, "title": "21.1 企业数字化转型发展规划-转型驱动力VS转型关注焦点", "scheduledDate": "2026-09-11", "missing": false },
+        { "id": "wen-w10-77", "type": "video", "lessonNo": 77, "title": "21.2 企业数字化转型-转型能力成熟度", "scheduledDate": "2026-09-11", "missing": false },
+        { "id": "wen-w10-78", "type": "video", "lessonNo": 78, "title": "21.3 企业数字化转型发展规划-转型规划要点及架构", "scheduledDate": "2026-09-11", "missing": false },
+        { "id": "wen-w10-79", "type": "video", "lessonNo": 79, "title": "22.1 智能制造发展规划-发展整体环境VS发展关注焦点", "scheduledDate": "2026-09-12", "missing": false },
+        { "id": "wen-w10-80", "type": "video", "lessonNo": 80, "title": "22.2 智能制造发展规划-成熟度模型vs系统架构", "scheduledDate": "2026-09-12", "missing": false },
+        { "id": "wen-w10-81", "type": "video", "lessonNo": 81, "title": "23.1 新型消费系统规划-宏观环境VS关注焦点", "scheduledDate": "2026-09-13", "missing": false },
+        { "id": "wen-w10-82", "type": "video", "lessonNo": 82, "title": "23.2 新型消费系统规划-规划要点VS系统架构", "scheduledDate": "2026-09-13", "missing": false },
+        { "id": "wen-w10-83", "type": "video", "lessonNo": 83, "title": "24.法律法规和标准规范", "scheduledDate": "2026-09-14", "missing": false }
+      ]
+    },
+    {
+      "id": "W11",
+      "stage": "案例",
+      "phase": "阶段二·案例突破",
+      "focus": "案例专题课 + 方法篇(4-10章)历年真题训练",
+      "caseArrangement": "做历年真题·正确率刷到90%+",
+      "start": "2026-09-15",
+      "end": "2026-09-21",
+      "tasks": [
+        { "id": "wen-w11-901", "type": "video", "lessonNo": 901, "title": "25.1 案例分析专题一", "scheduledDate": "2026-09-15", "missing": false },
+        { "id": "wen-w11-902", "type": "video", "lessonNo": 902, "title": "25.2 案例分析专题二", "scheduledDate": "2026-09-16", "missing": false }
+      ]
+    },
+    {
+      "id": "W12",
+      "stage": "案例",
+      "phase": "阶段二·案例突破",
+      "focus": "能力篇(11-17章) + 实践篇(18-24章)案例真题精练",
+      "caseArrangement": "熟悉做题套路和技巧·限时训练",
+      "start": "2026-09-22",
+      "end": "2026-09-28",
+      "tasks": []
+    },
+    {
+      "id": "W13",
+      "stage": "案例",
+      "phase": "阶段二·案例突破",
+      "focus": "案例模拟限时训练 + 错题汇总 + 查漏回顾",
+      "caseArrangement": "案例模拟+错题整理",
+      "start": "2026-09-29",
+      "end": "2026-10-05",
+      "tasks": []
+    },
+    {
+      "id": "W14",
+      "stage": "论文",
+      "phase": "阶段三·论文强化",
+      "focus": "论文写作专题课 + 模板练习 + 成文 + 提交老师批改",
+      "caseArrangement": "写出第一篇合格论文·批改合格为止",
+      "start": "2026-10-06",
+      "end": "2026-10-12",
+      "tasks": [
+        { "id": "wen-w14-903", "type": "video", "lessonNo": 903, "title": "26.1 论文写作专题-论文写作概述", "scheduledDate": "2026-10-06", "missing": false },
+        { "id": "wen-w14-904", "type": "video", "lessonNo": 904, "title": "26.2 论文专题-论文写作框架", "scheduledDate": "2026-10-07", "missing": false },
+        { "id": "wen-w14-905", "type": "video", "lessonNo": 905, "title": "26.3 论文专题-模拟题及点评", "scheduledDate": "2026-10-08", "missing": false }
+      ]
+    },
+    {
+      "id": "W15",
+      "stage": "冲刺",
+      "phase": "阶段四·查漏补缺",
+      "focus": "对照难点易错点整理错题本 + S/A档薄弱章回炉",
+      "caseArrangement": "综合模拟+错题回顾",
+      "start": "2026-10-13",
+      "end": "2026-10-19",
+      "tasks": []
+    },
+    {
+      "id": "W16",
+      "stage": "冲刺",
+      "phase": "阶段四·查漏补缺",
+      "focus": "考前状态调整 + 重点公式/框架速记",
+      "caseArrangement": "—",
+      "start": "2026-10-20",
+      "end": "2026-10-23",
+      "tasks": []
+    }
+  ]
+}

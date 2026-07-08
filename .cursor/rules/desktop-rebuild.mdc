@@ -1,0 +1,33 @@
+---
+description: 系规助手改完代码后必须自动重新打包桌面 App
+alwaysApply: true
+---
+
+# 桌面 App 自动打包（强制）
+
+本仓库是 Tauri 桌面应用。用户日常使用桌面「系规助手」，不是 `pnpm dev:app`。
+
+## Agent 必须执行
+
+在完成**任何**影响运行行为的改动后（`src/`、`src-tauri/`、`public/`、`scripts/`），**结束任务前必须自动打包**：
+
+```bash
+cd ~/Projects/xigui-pilot && ./scripts/update-desktop-app.sh
+```
+
+- **默认即打包**：用户未明确说「别打包 / 只 dev / 只讨论」时，一律执行
+- **不要等用户提醒**；Multitask 模式下子 agent 完成实现后也要打包
+- 打包约 1～2 分钟，可后台运行；告知用户「正在打包，完成后双击桌面系规助手即可」
+- 打包失败必须修复或说明原因，**禁止静默跳过**
+
+脚本已自动 `source ~/.cargo/env`；若仍缺 cargo，先提示安装 Rust 再重试。
+
+## 例外（仅此两种）
+
+- 用户明确说「先别打包 / 只用 dev 预览 / 只讨论」
+- 仅改 README、注释且**确定**不影响 App 行为
+
+## 给用户
+
+- **开发调试**：`pnpm dev:app` 热更新更快
+- **日常验证**：`~/Desktop/系规助手` 与发布版一致

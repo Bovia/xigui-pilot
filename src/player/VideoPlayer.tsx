@@ -73,21 +73,34 @@ export default function VideoPlayer({ lessonNo }: { lessonNo: number }) {
           lang: "zh-cn",
         });
 
+        const pushTimeUpdate = () => {
+          const art = artRef.current;
+          if (!art) return;
+          emit("player-timeupdate", {
+            lessonNo,
+            currentTime: art.currentTime,
+          }).catch(() => undefined);
+        };
+
         artRef.current.on("ready", () => {
           const art = artRef.current;
           if (!art) return;
           if (saved?.position) {
             art.seek = saved.position;
+            window.setTimeout(pushTimeUpdate, 150);
+            window.setTimeout(pushTimeUpdate, 500);
+          } else {
+            pushTimeUpdate();
           }
-          emit("player-timeupdate", {
-            lessonNo,
-            currentTime: art.currentTime,
-          }).catch(() => undefined);
         });
 
-        artRef.current.on("play", () => setPlaying(true));
+        artRef.current.on("play", () => {
+          setPlaying(true);
+          pushTimeUpdate();
+        });
         artRef.current.on("pause", () => setPlaying(false));
         artRef.current.on("video:ended", () => setPlaying(false));
+        artRef.current.on("video:seek", pushTimeUpdate);
 
         const win = getCurrentWindow();
 
@@ -108,12 +121,9 @@ export default function VideoPlayer({ lessonNo }: { lessonNo: number }) {
         });
 
         artRef.current.on("video:timeupdate", () => {
+          pushTimeUpdate();
           const art = artRef.current;
           if (!art) return;
-          emit("player-timeupdate", {
-            lessonNo,
-            currentTime: art.currentTime,
-          }).catch(() => undefined);
           window.clearTimeout(saveTimer);
           saveTimer = window.setTimeout(() => {
             saveVideoProgress(lessonNo, art.currentTime, art.duration || 0).catch(
@@ -127,6 +137,9 @@ export default function VideoPlayer({ lessonNo }: { lessonNo: number }) {
           const subtitle = await resolveSubtitlePath(lessonNo).catch(() => null);
           if (subtitle) {
             await openSubtitleWindow(lessonNo).catch(() => undefined);
+            // 字幕窗加载晚于播放器，补发当前进度
+            window.setTimeout(pushTimeUpdate, 300);
+            window.setTimeout(pushTimeUpdate, 1000);
           } else {
             setSubtitleHint(
               "未找到字幕文件：在与视频同目录放置同名 .srt 或 .vtt 后重新播放",

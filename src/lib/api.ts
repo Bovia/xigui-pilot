@@ -144,7 +144,7 @@ export async function loadPlan(variant?: PlanVariant) {
       v = "v2";
     }
   }
-  const file = v === "v2" ? "/plan-v2.json" : "/plan.json";
+  const file = v === "wen" ? "/plan-wen.json" : v === "v2" ? "/plan-v2.json" : "/plan.json";
   const res = await fetch(file);
   if (!res.ok) {
     throw new Error(`无法加载计划表：${file}`);

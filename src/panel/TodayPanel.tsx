@@ -20,6 +20,8 @@ import {
   setFloatingSubtitles,
   setWovenStyle,
 } from "../lib/api";
+import { getPlanHighlight } from "../lib/dynamicPlan";
+import { PLAN_VIEW_EVENT, readPlanSheetView } from "../lib/planSheetView";
 import type { CatalogLesson, PlanFile, TextbookFile, TodaySnapshot } from "../lib/types";
 import {
   isEyeRestEnabled,
@@ -192,7 +194,8 @@ function CatalogSectionBlock({
   lessons,
   expanded,
   onToggle,
-  weekLessonSet,
+  highlightLessonSet,
+  tagLabel,
   quizName,
   onPlay,
   onTextbook,
@@ -203,13 +206,14 @@ function CatalogSectionBlock({
   lessons: CatalogLesson[];
   expanded: boolean;
   onToggle: (id: string) => void;
-  weekLessonSet: Set<number>;
+  highlightLessonSet: Set<number>;
+  tagLabel: "今天" | "本周";
   quizName: string;
   onPlay: (lesson: CatalogLesson) => void;
   onTextbook: (lesson: CatalogLesson) => void;
   onQuiz: (lesson: CatalogLesson) => void;
 }) {
-  const weekCount = lessons.filter((l) => weekLessonSet.has(l.no)).length;
+  const highlightCount = lessons.filter((l) => highlightLessonSet.has(l.no)).length;
 
   return (
     <div className="space-y-1.5">
@@ -224,9 +228,9 @@ function CatalogSectionBlock({
           <span className="truncate text-[11px] font-medium text-slate-600">{title}</span>
           <span className="shrink-0 text-[10px] text-slate-400">{lessons.length} 节</span>
         </span>
-        {weekCount > 0 && (
+        {highlightCount > 0 && (
           <span className="woven-badge-week ml-2 shrink-0 rounded bg-blue-100 px-1.5 py-0.5 text-[9px] font-medium text-blue-600">
-            本周 {weekCount}
+            {tagLabel} {highlightCount}
           </span>
         )}
       </button>
@@ -243,7 +247,8 @@ function CatalogSectionBlock({
               <LessonRow
                 key={lesson.no}
                 lesson={lesson}
-                isThisWeek={weekLessonSet.has(lesson.no)}
+                isHighlighted={highlightLessonSet.has(lesson.no)}
+                tagLabel={tagLabel}
                 quizName={quizName}
                 onPlay={onPlay}
                 onTextbook={onTextbook}
@@ -262,14 +267,16 @@ const headerBtn =
 
 function LessonRow({
   lesson,
-  isThisWeek,
+  isHighlighted,
+  tagLabel,
   quizName,
   onPlay,
   onTextbook,
   onQuiz,
 }: {
   lesson: CatalogLesson;
-  isThisWeek: boolean;
+  isHighlighted: boolean;
+  tagLabel: "今天" | "本周";
   quizName: string;
   onPlay: (lesson: CatalogLesson) => void;
   onTextbook: (lesson: CatalogLesson) => void;
@@ -283,10 +290,10 @@ function LessonRow({
   return (
     <div
       className={`lesson-card relative rounded-xl border px-3 py-2.5 transition ${
-        isThisWeek ? "lesson-card--week border-blue-200/80 bg-blue-50/30" : "border-slate-200/80 bg-white"
+        isHighlighted ? "lesson-card--week border-blue-200/80 bg-blue-50/30" : "border-slate-200/80 bg-white"
       } ${lesson.completed ? "opacity-75" : ""} ${lesson.missing ? "opacity-45" : ""}`}
     >
-      {isThisWeek && (
+      {isHighlighted && (
         <span className="absolute left-0 top-2 bottom-2 w-0.5 rounded-full bg-blue-500" />
       )}
       <div className="flex items-center gap-2">
@@ -295,9 +302,9 @@ function LessonRow({
         </span>
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-1.5">
-            {isThisWeek && (
+            {isHighlighted && (
               <span className="woven-badge-week shrink-0 rounded bg-blue-100 px-1 py-0.5 text-[9px] font-medium text-blue-600">
-                本周
+                {tagLabel}
               </span>
             )}
             <div className="truncate text-[12px] font-medium leading-5 text-slate-800">
@@ -396,6 +403,16 @@ async function loadCatalog(): Promise<CatalogLesson[]> {
   return [...fromPlan, ...live];
 }
 
+async function fetchPlanHighlight(weekId: string, today: string) {
+  const view = readPlanSheetView();
+  const [planV2, planWen, progress] = await Promise.all([
+    loadPlan("v2") as Promise<PlanFile>,
+    loadPlan("wen") as Promise<PlanFile>,
+    getProgress(),
+  ]);
+  return getPlanHighlight(view, planV2, planWen, progress.videos, today, weekId);
+}
+
 export default function TodayPanel() {
   const [snapshot, setSnapshot] = useState<TodaySnapshot | null>(null);
   const [catalog, setCatalog] = useState<CatalogLesson[]>([]);
@@ -412,6 +429,10 @@ export default function TodayPanel() {
   const [guideOpen, setGuideOpen] = useState(false);
   const [planOpen, setPlanOpen] = useState(false);
   const [expandedSections, setExpandedSections] = useState(loadExpandedSections);
+  const [planHighlight, setPlanHighlight] = useState<{
+    lessonNos: Set<number>;
+    tagLabel: "今天" | "本周";
+  }>({ lessonNos: new Set(), tagLabel: "本周" });
   const menuRef = useRef<HTMLDivElement>(null);
 
   const toggleSection = useCallback((id: string) => {
@@ -432,6 +453,14 @@ export default function TodayPanel() {
         setCatalog(await loadCatalog());
       } else {
         setCatalog([]);
+      }
+      try {
+        setPlanHighlight(await fetchPlanHighlight(data.weekId, data.date));
+      } catch {
+        setPlanHighlight({
+          lessonNos: new Set(data.weekLessonNos ?? []),
+          tagLabel: "本周",
+        });
       }
     } catch (e) {
       setError(String(e));
@@ -505,6 +534,17 @@ export default function TodayPanel() {
     document.addEventListener("pointerdown", onPointerDown);
     return () => document.removeEventListener("pointerdown", onPointerDown);
   }, [menuOpen]);
+
+  useEffect(() => {
+    if (!snapshot) return;
+    const onPlanViewChange = () => {
+      fetchPlanHighlight(snapshot.weekId, snapshot.date)
+        .then(setPlanHighlight)
+        .catch(() => undefined);
+    };
+    window.addEventListener(PLAN_VIEW_EVENT, onPlanViewChange);
+    return () => window.removeEventListener(PLAN_VIEW_EVENT, onPlanViewChange);
+  }, [snapshot]);
 
   const handlePlay = async (lesson: CatalogLesson) => {
     if (lesson.missing) return;
@@ -588,7 +628,6 @@ export default function TodayPanel() {
       : 0;
 
   const playableCount = catalog.filter((l) => !l.missing).length;
-  const weekLessonSet = new Set(snapshot?.weekLessonNos ?? []);
 
   return (
     <div className={`panel-shell relative h-full overflow-hidden rounded-2xl${wovenStyle ? " theme-woven" : ""}`}>
@@ -795,7 +834,8 @@ export default function TodayPanel() {
                 lessons={section.lessons}
                 expanded={expandedSections[section.id] ?? true}
                 onToggle={toggleSection}
-                weekLessonSet={weekLessonSet}
+                highlightLessonSet={planHighlight.lessonNos}
+                tagLabel={planHighlight.tagLabel}
                 quizName={quizName}
                 onPlay={handlePlay}
                 onTextbook={handleTextbook}

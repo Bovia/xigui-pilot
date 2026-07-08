@@ -10,6 +10,8 @@ pub struct VideoProgress {
     pub duration: f64,
     pub completed: bool,
     pub updated_at: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub last_activity_date: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]

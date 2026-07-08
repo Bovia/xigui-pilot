@@ -95,17 +95,27 @@ export interface PlanWeek {
   }>;
 }
 
+export interface LiveSession {
+  no: number;
+  title: string;
+  date: string;
+  time: string;
+  format?: string;
+  chapterHint?: string;
+}
+
 export interface PlanFile {
   planId?: string;
   planName?: string;
   examDate?: string;
   startDate?: string;
   milestones?: PlanMilestone[];
+  liveSessions?: LiveSession[];
   weeks?: PlanWeek[];
   lessons: Record<string, PlanLesson>;
 }
 
-export type PlanVariant = "default" | "v2";
+export type PlanVariant = "default" | "v2" | "wen";
 
 /** 计划表弹窗内的视图（不影响后端 plan.json 选择，后端固定 v2） */
-export type PlanSheetView = "overview" | "weekDaily";
+export type PlanSheetView = "overview" | "weekDaily" | "wenOverview";

@@ -16,6 +16,7 @@ export default function SubtitleOverlay({ lessonNo }: { lessonNo: number }) {
   const [cues, setCues] = useState<SubtitleCue[]>([]);
   const [currentText, setCurrentText] = useState("");
   const [nextText, setNextText] = useState("");
+  const [placeholder, setPlaceholder] = useState("等待播放同步");
   const [error, setError] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
   const saveTimer = useRef<number | undefined>(undefined);
@@ -56,6 +57,12 @@ export default function SubtitleOverlay({ lessonNo }: { lessonNo: number }) {
 
         setCues(parsed);
         setReady(true);
+        const lastEnd = parsed[parsed.length - 1]?.end ?? 0;
+        if (lastEnd > 0 && lastEnd < 3600) {
+          setPlaceholder(`此处暂无字幕（本文件约覆盖至 ${formatClock(lastEnd)}）`);
+        } else {
+          setPlaceholder("此处暂无字幕");
+        }
       } catch (e) {
         if (!disposed) {
           setError(String(e));
@@ -103,6 +110,13 @@ export default function SubtitleOverlay({ lessonNo }: { lessonNo: number }) {
         const upcoming = nextCue(cues, event.payload.currentTime);
         setCurrentText(cue?.text ?? "");
         setNextText(upcoming && upcoming !== cue ? upcoming.text : "");
+        if (!cue?.text) {
+          setPlaceholder(
+            event.payload.currentTime > (cues[cues.length - 1]?.end ?? 0)
+              ? `此处暂无字幕（本文件约覆盖至 ${formatClock(cues[cues.length - 1]?.end ?? 0)}）`
+              : "等待播放同步",
+          );
+        }
       },
     );
 
@@ -141,10 +155,17 @@ export default function SubtitleOverlay({ lessonNo }: { lessonNo: number }) {
         {currentText ? (
           <p className="subtitle-current">{currentText}</p>
         ) : (
-          <p className="subtitle-placeholder">等待字幕</p>
+          <p className="subtitle-placeholder">{placeholder}</p>
         )}
         {nextText && <p className="subtitle-next">{nextText}</p>}
       </div>
     </div>
   );
+}
+
+function formatClock(seconds: number): string {
+  const total = Math.max(0, Math.floor(seconds));
+  const m = Math.floor(total / 60);
+  const s = total % 60;
+  return `${m}:${String(s).padStart(2, "0")}`;
 }

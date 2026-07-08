@@ -42,7 +42,7 @@ impl Settings {
 
     pub fn plan_variant(&self) -> &str {
     match self.plan_variant.as_deref() {
-        Some("v2") | Some("default") => "v2",
+        Some("v2") | Some("default") | Some("wen") => self.plan_variant.as_deref().unwrap_or("v2"),
         _ => "v2",
     }
     }

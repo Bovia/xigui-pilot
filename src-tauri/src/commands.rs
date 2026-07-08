@@ -560,11 +560,13 @@ pub fn save_video_progress(
 ) -> Result<VideoProgress, String> {
     let (path, mut progress) = progress_for(&app)?;
     let completed = duration > 0.0 && position / duration >= 0.9;
+    let today = today_string();
     let entry = VideoProgress {
         position,
         duration,
         completed,
         updated_at: Local::now().to_rfc3339(),
+        last_activity_date: Some(today),
     };
     progress
         .videos

@@ -57,9 +57,15 @@ export default function EyeRestPrompt({
     );
   }
 
+  const centered = variant === "player";
+
   return (
     <div
-      className={`absolute inset-x-0 bottom-0 z-50 border-t px-4 py-3 ${
+      className={`z-50 ${
+        centered
+          ? "absolute left-1/2 top-1/2 w-full max-w-md -translate-x-1/2 -translate-y-1/2 rounded-xl border px-4 py-3 shadow-lg"
+          : "absolute inset-x-0 bottom-0 border-t px-4 py-3"
+      } ${
         dark
           ? "border-slate-700 bg-slate-900 text-slate-100"
           : "border-amber-100 bg-amber-50 text-slate-800"

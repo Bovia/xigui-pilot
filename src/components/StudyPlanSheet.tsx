@@ -1,15 +1,19 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { getProgress, loadPlan, setPlanVariant } from "../lib/api";
+import { getProgress, loadPlan } from "../lib/api";
 import CloseButton from "./CloseButton";
 import PlanTableModal from "./PlanTableModal";
 import {
   buildWeekDailyPlan,
   dynamicStatus,
+  todayIso,
   type WeekDayRow,
 } from "../lib/dynamicPlan";
-import type { PlanFile, PlanMilestone, PlanSheetView, PlanWeek } from "../lib/types";
-
-const PLAN_VIEW_KEY = "xigui.planSheetView";
+import {
+  planVariantForView,
+  readPlanSheetView,
+  writePlanSheetView,
+} from "../lib/planSheetView";
+import type { LiveSession, PlanFile, PlanMilestone, PlanSheetView, PlanWeek } from "../lib/types";
 
 const PLAN_OPTIONS: Array<{
   id: PlanSheetView;
@@ -20,6 +24,11 @@ const PLAN_OPTIONS: Array<{
     id: "overview",
     label: "考纲优化版",
     hint: "2024 大纲 · 16 周总览",
+  },
+  {
+    id: "wenOverview",
+    label: "文老师规划",
+    hint: "四阶段 · 60/30/10/2h",
   },
   {
     id: "weekDaily",
@@ -48,12 +57,25 @@ function phaseTone(phase: string) {
   return "bg-slate-100 text-slate-600";
 }
 
-function readStoredView(): PlanSheetView {
-  try {
-    return localStorage.getItem(PLAN_VIEW_KEY) === "weekDaily" ? "weekDaily" : "overview";
-  } catch {
-    return "overview";
-  }
+function isLiveSoon(session: LiveSession, today: string) {
+  const diff =
+    (parseLocalMs(session.date) - parseLocalMs(today)) / (1000 * 60 * 60 * 24);
+  return diff >= 0 && diff <= 7;
+}
+
+function parseLocalMs(iso: string) {
+  return new Date(`${iso}T00:00:00`).getTime();
+}
+
+function formatLiveDate(iso: string) {
+  const d = new Date(`${iso}T00:00:00`);
+  return `${d.getMonth() + 1}/${d.getDate()}`;
+}
+
+function activeLiveSession(sessions: LiveSession[] | undefined, today: string) {
+  if (!sessions?.length) return null;
+  const upcoming = sessions.find((s) => s.date >= today);
+  return upcoming ?? sessions[sessions.length - 1];
 }
 
 function isWithinRange(today: string, start: string, end: string) {
@@ -62,6 +84,12 @@ function isWithinRange(today: string, start: string, end: string) {
 
 function activeMilestone(milestones: PlanMilestone[] | undefined, today: string) {
   return milestones?.find((m) => isWithinRange(today, m.start, m.end));
+}
+
+function formatProgressLine(st: ReturnType<typeof dynamicStatus>) {
+  if (st.remaining === 0) return "已全部完成";
+  if (st.nextLesson) return `${st.done}/${st.total} · 下节 ${st.nextLesson.no}`;
+  return `${st.done}/${st.total}`;
 }
 
 const DEFAULT_REGISTRATION: PlanMilestone = {
@@ -99,8 +127,9 @@ export default function StudyPlanSheet({
   currentWeekId?: string;
   daysToExam?: number;
 }) {
-  const [view, setView] = useState<PlanSheetView>(readStoredView);
+  const [view, setView] = useState<PlanSheetView>(readPlanSheetView);
   const [weeks, setWeeks] = useState<PlanWeek[]>([]);
+  const [liveSessions, setLiveSessions] = useState<LiveSession[]>([]);
   const [examDate, setExamDate] = useState<string | null>(null);
   const [milestones, setMilestones] = useState<PlanMilestone[]>([]);
   const [weekDaily, setWeekDaily] = useState<WeekDayRow[]>([]);
@@ -113,15 +142,16 @@ export default function StudyPlanSheet({
 
   const activeOption = PLAN_OPTIONS.find((o) => o.id === view) ?? PLAN_OPTIONS[0];
 
-  const today = useMemo(() => {
-    const d = new Date();
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-  }, [open]);
+  const today = useMemo(() => todayIso(), [open]);
+
+  function isWithinRangeLocal(today: string, start: string, end: string) {
+    return today >= start && today <= end;
+  }
 
   const registration = useMemo(() => {
     const active = activeMilestone(milestones, today);
     if (active) return active;
-    if (isWithinRange(today, DEFAULT_REGISTRATION.start, DEFAULT_REGISTRATION.end)) {
+    if (isWithinRangeLocal(today, DEFAULT_REGISTRATION.start, DEFAULT_REGISTRATION.end)) {
       return DEFAULT_REGISTRATION;
     }
     return null;
@@ -135,26 +165,25 @@ export default function StudyPlanSheet({
     }
     setLoading(true);
     setError(null);
-    Promise.all([loadPlan("v2") as Promise<PlanFile>, getProgress()])
-      .then(([plan, progress]) => {
+    const planVariant = planVariantForView(view);
+    Promise.all([loadPlan(planVariant) as Promise<PlanFile>, getProgress()])
+      .then(async ([plan, progress]) => {
         setWeeks(plan.weeks ?? []);
+        setLiveSessions(plan.liveSessions ?? []);
         setExamDate(plan.examDate ?? null);
         setMilestones(plan.milestones ?? [DEFAULT_REGISTRATION]);
 
         const weekId = currentWeekId ?? plan.weeks?.[0]?.id ?? "W1";
-        const daily = buildWeekDailyPlan(plan, progress.videos, today, weekId);
-        setWeekDaily(daily);
-
-        const st = dynamicStatus(plan, progress.videos, today);
-        if (st.remaining === 0) {
-          setProgressLine("已全部完成");
-        } else if (st.nextLesson) {
-          setProgressLine(`${st.done}/${st.total} · 下节 ${st.nextLesson.no}`);
+        if (view === "weekDaily") {
+          const v2 = (await loadPlan("v2")) as PlanFile;
+          setWeekDaily(buildWeekDailyPlan(v2, progress.videos, today, weekId));
+          const st = dynamicStatus(v2, progress.videos, today);
+          setProgressLine(formatProgressLine(st));
         } else {
-          setProgressLine(`${st.done}/${st.total}`);
+          setWeekDaily([]);
+          const st = dynamicStatus(plan, progress.videos, today);
+          setProgressLine(formatProgressLine(st));
         }
-
-        setPlanVariant("v2").catch(() => undefined);
       })
       .catch((e) => {
         setWeeks([]);
@@ -162,7 +191,7 @@ export default function StudyPlanSheet({
         setError(e instanceof Error ? e.message : String(e));
       })
       .finally(() => setLoading(false));
-  }, [open, currentWeekId, today]);
+  }, [open, currentWeekId, today, view]);
 
   useEffect(() => {
     if (!menuOpen) return;
@@ -178,12 +207,10 @@ export default function StudyPlanSheet({
   const switchView = (next: PlanSheetView) => {
     setView(next);
     setMenuOpen(false);
-    try {
-      localStorage.setItem(PLAN_VIEW_KEY, next);
-    } catch {
-      /* ignore */
-    }
+    writePlanSheetView(next);
   };
+
+  const nextLive = view === "wenOverview" ? activeLiveSession(liveSessions, today) : null;
 
   if (!open) return null;
 
@@ -272,6 +299,28 @@ export default function StudyPlanSheet({
             </div>
           </div>
 
+          {nextLive && (
+            <div className="mb-3 rounded-xl border border-violet-200 bg-violet-50/80 px-3 py-2.5">
+              <div className="text-[12px] font-semibold text-violet-900">
+                直播第 {nextLive.no} 次 · {formatLiveDate(nextLive.date)} {nextLive.time}
+                {nextLive.date === today && (
+                  <span className="ml-1.5 rounded bg-violet-200 px-1.5 py-0.5 text-[9px] font-medium text-violet-800">
+                    今天
+                  </span>
+                )}
+                {isLiveSoon(nextLive, today) && nextLive.date !== today && (
+                  <span className="ml-1.5 rounded bg-violet-100 px-1.5 py-0.5 text-[9px] text-violet-700">
+                    本周
+                  </span>
+                )}
+              </div>
+              <p className="mt-0.5 text-[11px] leading-5 text-violet-800">{nextLive.title}</p>
+              {nextLive.format && (
+                <p className="mt-0.5 text-[10px] text-violet-600">{nextLive.format}</p>
+              )}
+            </div>
+          )}
+
           {registration && (
             <div className="mb-3 rounded-xl border border-amber-300 bg-amber-50 px-3 py-2.5">
               <div className="text-[12px] font-semibold text-amber-900">
@@ -353,7 +402,7 @@ export default function StudyPlanSheet({
             </div>
           )}
 
-          {!loading && view === "overview" && (
+          {!loading && (view === "overview" || view === "wenOverview") && (
             <div className="space-y-2">
               {weeks.map((week) => {
                 const isCurrent = week.id === currentWeekId;

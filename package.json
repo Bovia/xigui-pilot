@@ -6,12 +6,16 @@
   "scripts": {
     "dev": "vite",
     "dev:app": "pnpm tauri dev",
+    "watch:app": "node scripts/watch_app.js",
+    "package:app": "./scripts/update-desktop-app.sh",
     "build": "tsc && vite build",
     "preview": "vite preview",
     "tauri": "tauri",
     "gen:plan": "python3 scripts/generate_plan.py",
     "gen:plan-v2": "python3 scripts/generate_plan_workbooks.py",
-    "gen:subtitle": "python3 scripts/generate_subtitle.py"
+    "gen:subtitle": "python3 scripts/generate_subtitle.py",
+    "gen:subtitles:batch": "python3 scripts/batch_generate_subtitles.py",
+    "gen:subtitles:overnight": "./scripts/overnight_subtitles.sh"
   },
   "dependencies": {
     "@tauri-apps/api": "^2.11.1",
@@ -27,6 +31,7 @@
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^6.0.3",
+    "chokidar": "^5.0.0",
     "tailwindcss": "^4.3.2",
     "typescript": "^6.0.3",
     "vite": "^8.1.3"
