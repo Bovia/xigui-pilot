@@ -1,7 +1,8 @@
 import { convertFileSrc } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { PhysicalPosition, getCurrentWindow } from "@tauri-apps/api/window";
-import { useEffect, useRef, useState } from "react";
+import { WebviewWindow } from "@tauri-apps/api/webviewWindow";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { resolveSubtitlePath } from "../lib/api";
 import {
   cueAtTime,
@@ -12,6 +13,8 @@ import {
   type SubtitleCue,
 } from "../lib/subtitles";
 
+const DRAG_THRESHOLD_PX = 5;
+
 export default function SubtitleOverlay({ lessonNo }: { lessonNo: number }) {
   const [cues, setCues] = useState<SubtitleCue[]>([]);
   const [currentText, setCurrentText] = useState("");
@@ -20,6 +23,14 @@ export default function SubtitleOverlay({ lessonNo }: { lessonNo: number }) {
   const [error, setError] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
   const saveTimer = useRef<number | undefined>(undefined);
+  const dragState = useRef({ x: 0, y: 0, didDrag: false, dragStarted: false });
+
+  const focusPlayerWindow = useCallback(async () => {
+    const player = await WebviewWindow.getByLabel("player").catch(() => null);
+    if (!player) return;
+    await player.show().catch(() => undefined);
+    await player.setFocus().catch(() => undefined);
+  }, [lessonNo]);
 
   useEffect(() => {
     document.documentElement.classList.add("subtitle-view");
@@ -66,7 +77,6 @@ export default function SubtitleOverlay({ lessonNo }: { lessonNo: number }) {
       } catch (e) {
         if (!disposed) {
           setError(String(e));
-          await closeSelf();
         }
       }
     }
@@ -79,8 +89,10 @@ export default function SubtitleOverlay({ lessonNo }: { lessonNo: number }) {
 
   useEffect(() => {
     const win = getCurrentWindow();
+    win.setAlwaysOnTop(true).catch(() => undefined);
+
     const saved = loadSubtitlePosition();
-    if (saved) {
+    if (saved && saved.x >= -200 && saved.y >= 0 && saved.x < 4000 && saved.y < 4000) {
       win.setPosition(new PhysicalPosition(saved.x, saved.y)).catch(() => undefined);
     } else {
       win.center().catch(() => undefined);
@@ -128,7 +140,9 @@ export default function SubtitleOverlay({ lessonNo }: { lessonNo: number }) {
   useEffect(() => {
     const unlistenPromise = listen<number>("subtitle-open", (event) => {
       if (event.payload === lessonNo) {
-        getCurrentWindow().show().catch(() => undefined);
+        const win = getCurrentWindow();
+        win.show().catch(() => undefined);
+        win.setAlwaysOnTop(true).catch(() => undefined);
       }
     });
 
@@ -137,20 +151,49 @@ export default function SubtitleOverlay({ lessonNo }: { lessonNo: number }) {
     };
   }, [lessonNo]);
 
-  function startDrag(e: React.MouseEvent) {
+  function onBarMouseDown(e: React.MouseEvent) {
     if (e.button !== 0) return;
+    dragState.current = {
+      x: e.clientX,
+      y: e.clientY,
+      didDrag: false,
+      dragStarted: false,
+    };
+  }
+
+  function onBarMouseMove(e: React.MouseEvent) {
+    const state = dragState.current;
+    if (state.dragStarted) return;
+    if (Math.hypot(e.clientX - state.x, e.clientY - state.y) <= DRAG_THRESHOLD_PX) return;
+    state.didDrag = true;
+    state.dragStarted = true;
     getCurrentWindow().startDragging().catch(() => undefined);
   }
 
+  function onBarMouseUp(e: React.MouseEvent) {
+    if (e.button !== 0) return;
+    if (dragState.current.didDrag) return;
+    focusPlayerWindow().catch(() => undefined);
+  }
+
   if (error) {
-    return null;
+    return (
+      <div className="subtitle-overlay-shell flex h-full w-full items-end justify-center p-2">
+        <div className="subtitle-bar w-full max-w-2xl">
+          <p className="subtitle-placeholder">{error}</p>
+        </div>
+      </div>
+    );
   }
 
   return (
     <div className="subtitle-overlay-shell flex h-full w-full items-end justify-center p-2">
       <div
         className="subtitle-bar w-full max-w-2xl cursor-grab select-none active:cursor-grabbing"
-        onMouseDown={startDrag}
+        title="点击前置视频 · 拖动移动"
+        onMouseDown={onBarMouseDown}
+        onMouseMove={onBarMouseMove}
+        onMouseUp={onBarMouseUp}
       >
         {currentText ? (
           <p className="subtitle-current">{currentText}</p>

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState, Fragment } from "react";
+import { listen } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import {
   getProgress,
@@ -11,7 +12,6 @@ import {
   loadTextbook,
   openExternalVideo,
   openPlayer,
-  openQuiz,
   openTextbook,
   openTricolorNotes,
   pickRootDir,
@@ -21,6 +21,8 @@ import {
   setPanelPinned,
   setFloatingSubtitles,
   setWovenStyle,
+  syncPaceTodayLock,
+  toggleQuizDone,
 } from "../lib/api";
 import {
   formatWenTodayMarquee,
@@ -28,20 +30,19 @@ import {
   type WenBenchmark,
 } from "../lib/wenPlan";
 import { computeLessonTags, type LessonTagState } from "../lib/lessonTags";
-import { formatTodayMarquee, computeTodayPlanProgress, type TodayPlanProgress } from "../lib/pacePlan";
+import { formatTodayMarquee, computeTodayPlanProgress, getTodayPaceContract, type TodayPlanProgress } from "../lib/pacePlan";
 import { PLAN_VIEW_EVENT } from "../lib/planSheetView";
 import { PACE_CHANGED_EVENT, readDailyStudyHours } from "../lib/studyPace";
 import {
   formatStageMarquee,
   getStageCard,
-  type StageCard,
 } from "../lib/studyStage";
 import type { CatalogLesson, PlanFile, TextbookFile, TodaySnapshot } from "../lib/types";
 import {
   isEyeRestEnabled,
   setEyeRestEnabled,
 } from "../lib/eyeRest";
-import { quizTooltip } from "../lib/quiz";
+import { quizChapterKey, quizTooltip } from "../lib/quiz";
 import Tooltip from "../components/Tooltip";
 import BookTooltip from "../components/BookTooltip";
 import HelpGuide from "../components/HelpGuide";
@@ -56,10 +57,14 @@ function formatDate(date: string) {
 function formatProgress(position: number, duration: number, completed: boolean) {
   if (completed) return "已完成";
   const totalMin = duration > 0 ? Math.floor(duration / 60) : 0;
-  if (!position) {
+  if (position <= 0) {
     return totalMin > 0 ? `${totalMin} 分钟` : "—";
   }
   const watched = Math.floor(position / 60);
+  if (watched <= 0 && position > 0) {
+    const sec = Math.floor(position);
+    return totalMin > 0 ? `已看 ${sec} 秒 / ${totalMin} 分钟` : `已看 ${sec} 秒`;
+  }
   if (totalMin > 0) {
     return `已看 ${watched}/${totalMin} 分钟`;
   }
@@ -203,58 +208,21 @@ function ChevronIcon({ expanded }: { expanded: boolean }) {
   );
 }
 
-function StageStatusCard({
-  card,
-  todayProgress,
-  showTodayBar,
-}: {
-  card: StageCard;
-  todayProgress: TodayPlanProgress | null;
-  showTodayBar: boolean;
-}) {
-  if (card.kind === "recording") {
-    return (
-      <div className="rounded-xl border border-slate-200/80 bg-slate-50/80 px-3 py-2.5">
-        <div className="text-[12px] font-semibold text-slate-800">
-          {card.phase}（{card.subLabel}）
-        </div>
-        <p className="mt-1 text-[11px] leading-5 text-slate-500">
-          录播剩余 {card.remainingLessons} 节 · 约 {card.remainingHours.toFixed(1)} 小时
-        </p>
-        {showTodayBar && todayProgress && (
-          <div className="mt-2.5">
-            <div className="mb-1 flex items-center justify-between text-[11px] text-slate-500">
-              <span>
-                今日 {todayProgress.lessonDone}/{todayProgress.lessonTotal} 节
-              </span>
-              <span>{todayProgress.timePct}%</span>
-            </div>
-            <div className="woven-progress-track h-1.5 overflow-hidden rounded-full bg-slate-200/80">
-              <div
-                className="woven-progress-fill h-full rounded-full bg-blue-500 transition-all"
-                style={{ width: `${todayProgress.timePct}%` }}
-              />
-            </div>
-            <p className="mt-1 text-[10px] text-slate-400">
-              已学 {todayProgress.watchedHours.toFixed(1)} / {todayProgress.plannedHours.toFixed(1)} 小时
-            </p>
-          </div>
-        )}
-      </div>
-    );
-  }
-
+function TodayProgressBar({ progress }: { progress: TodayPlanProgress }) {
   return (
-    <div className="rounded-xl border border-violet-200/80 bg-violet-50/50 px-3 py-2.5">
-      <div className="text-[12px] font-semibold text-slate-800">{card.phase}</div>
-      {card.focus && (
-        <p className="mt-1 text-[11px] leading-5 text-slate-600">{card.focus}</p>
-      )}
-      <ul className="mt-1.5 space-y-0.5 text-[11px] leading-5 text-slate-500">
-        {card.hints.map((hint) => (
-          <li key={hint}>· {hint}</li>
-        ))}
-      </ul>
+    <div className="mb-2">
+      <div className="mb-1 flex items-center justify-between text-[11px] text-slate-500">
+        <span>
+          今日 {progress.lessonDone}/{progress.lessonTotal} 节
+        </span>
+        <span>{progress.timePct}%</span>
+      </div>
+      <div className="woven-progress-track h-1 overflow-hidden rounded-full bg-slate-100">
+        <div
+          className="woven-progress-fill h-full rounded-full bg-blue-500 transition-all"
+          style={{ width: `${progress.timePct}%` }}
+        />
+      </div>
     </div>
   );
 }
@@ -281,7 +249,6 @@ function CatalogSectionBlock({
   expanded,
   onToggle,
   lessonTags,
-  quizName,
   onPlay,
   onTextbook,
   onTricolorNotes,
@@ -293,7 +260,6 @@ function CatalogSectionBlock({
   expanded: boolean;
   onToggle: (id: string) => void;
   lessonTags: LessonTagState;
-  quizName: string;
   onPlay: (lesson: CatalogLesson) => void;
   onTextbook: (lesson: CatalogLesson) => void;
   onTricolorNotes: (lesson: CatalogLesson) => void;
@@ -333,7 +299,6 @@ function CatalogSectionBlock({
                     lesson={lesson}
                     isExecution={lessonTags.executionLessonNos.has(lesson.no)}
                     executionLabel={lessonTags.executionLabel}
-                    quizName={quizName}
                     onPlay={onPlay}
                     onTextbook={onTextbook}
                     onTricolorNotes={onTricolorNotes}
@@ -356,7 +321,6 @@ function LessonRow({
   lesson,
   isExecution,
   executionLabel,
-  quizName,
   onPlay,
   onTextbook,
   onTricolorNotes,
@@ -365,18 +329,18 @@ function LessonRow({
   lesson: CatalogLesson;
   isExecution: boolean;
   executionLabel: "今天" | "本周" | null;
-  quizName: string;
   onPlay: (lesson: CatalogLesson) => void;
   onTextbook: (lesson: CatalogLesson) => void;
   onTricolorNotes: (lesson: CatalogLesson) => void;
   onQuiz: (lesson: CatalogLesson) => void;
 }) {
   const pct = progressPercent(lesson.position, lesson.duration, lesson.completed);
-  const quizTip = quizTooltip(lesson.title, quizName);
+  const quizTip = quizTooltip(lesson.title, lesson.quizDone ?? false);
   const showStudyExtras = lesson.category !== "special" && lesson.category !== "live";
 
   return (
     <div
+      data-lesson-no={lesson.no}
       className={`lesson-card relative rounded-xl border px-3 py-2.5 transition ${
         isExecution ? "lesson-card--week border-blue-200/80 bg-blue-50/30" : "border-slate-200/80 bg-white"
       } ${lesson.completed ? "opacity-75" : ""} ${lesson.missing ? "opacity-45" : ""}`}
@@ -418,9 +382,13 @@ function LessonRow({
                 <button
                   type="button"
                   onClick={() => onQuiz(lesson)}
-                  className="woven-btn-tag flex h-8 w-8 items-center justify-center rounded-full border border-emerald-200 bg-emerald-50 text-[10px] font-medium text-emerald-600 hover:bg-emerald-100"
+                  className={`woven-btn-tag flex h-8 w-8 items-center justify-center rounded-full border text-[10px] font-medium ${
+                    lesson.quizDone
+                      ? "border-emerald-500 bg-emerald-500 text-white hover:bg-emerald-600"
+                      : "border-emerald-200 bg-emerald-50 text-emerald-600 hover:bg-emerald-100"
+                  }`}
                 >
-                  题
+                  {lesson.quizDone ? "题✓" : "题"}
                 </button>
               </Tooltip>
               <BookTooltip
@@ -458,6 +426,7 @@ async function loadCatalog(): Promise<CatalogLesson[]> {
   const fromPlan = Object.values(plan.lessons)
     .sort((a, b) => a.no - b.no)
     .map((lesson) => {
+      const chapterKey = quizChapterKey(lesson.title);
       const saved = progress.videos[String(lesson.no)];
       const page = textbook.lessons[String(lesson.no)]?.page;
       return {
@@ -469,6 +438,8 @@ async function loadCatalog(): Promise<CatalogLesson[]> {
         duration: saved?.duration || lesson.durationSec || 0,
         completed: saved?.completed ?? false,
         textbookPage: page,
+        quizChapterKey: chapterKey,
+        quizDone: progress.quiz_done?.[chapterKey] ?? false,
       };
     });
 
@@ -495,10 +466,11 @@ async function loadPanelMeta(snapshot: TodaySnapshot) {
     getProgress(),
   ]);
   const dailyHours = readDailyStudyHours();
+  const contract = getTodayPaceContract(plan, progress.videos, snapshot.date, dailyHours);
+  syncPaceTodayLock(snapshot.date, dailyHours, contract).catch(() => undefined);
   const stageCard = getStageCard(plan, planWen, progress.videos, snapshot.date);
   return {
     tags: computeLessonTags(plan, planWen, progress.videos, snapshot.date, dailyHours),
-    stageCard,
     stageText: formatStageMarquee(stageCard),
     todayText: formatTodayMarquee(plan, progress.videos, snapshot.date, dailyHours),
     wenText: formatWenTodayMarquee(planWen, snapshot.date),
@@ -536,13 +508,13 @@ export default function TodayPanel() {
     executionLabel: null,
   });
   const [wenBenchmark, setWenBenchmark] = useState<WenBenchmark | null>(null);
-  const [stageCard, setStageCard] = useState<StageCard | null>(null);
   const [todayProgress, setTodayProgress] = useState<TodayPlanProgress | null>(null);
   const [showTodayBar, setShowTodayBar] = useState(false);
   const [stageText, setStageText] = useState("—");
   const [todayMarquee, setTodayMarquee] = useState("—");
   const [wenMarquee, setWenMarquee] = useState("—");
   const menuRef = useRef<HTMLDivElement>(null);
+  const panelScrollRef = useRef<HTMLDivElement>(null);
 
   const toggleSection = useCallback((id: string) => {
     setExpandedSections((prev) => {
@@ -566,7 +538,6 @@ export default function TodayPanel() {
       try {
         const meta = await loadPanelMeta(data);
         setWenBenchmark(meta.benchmark);
-        setStageCard(meta.stageCard);
         setStageText(meta.stageText);
         setTodayMarquee(meta.todayText);
         setWenMarquee(meta.wenText);
@@ -575,7 +546,6 @@ export default function TodayPanel() {
         setLessonTags(meta.tags);
       } catch {
         setWenBenchmark(null);
-        setStageCard(null);
         setStageText("—");
         setTodayMarquee("—");
         setWenMarquee("—");
@@ -654,12 +624,82 @@ export default function TodayPanel() {
   }, [refresh]);
 
   useEffect(() => {
+    const unlistenPromise = listen<{
+      lessonNo: number;
+      position: number;
+      duration: number;
+    }>("video-progress-updated", (event) => {
+      const { lessonNo, position, duration } = event.payload;
+      setCatalog((prev) =>
+        prev.map((lesson) =>
+          lesson.no === lessonNo
+            ? {
+                ...lesson,
+                position,
+                duration: duration || lesson.duration,
+                completed: lesson.completed || (duration > 0 && position / duration >= 0.9),
+              }
+            : lesson,
+        ),
+      );
+      if (!snapshot) return;
+      loadPanelMeta(snapshot)
+        .then((meta) => {
+          setTodayProgress(meta.todayProgress);
+          setTodayMarquee(meta.todayText);
+        })
+        .catch(() => undefined);
+    });
+    return () => {
+      unlistenPromise.then((unlisten) => unlisten());
+    };
+  }, [snapshot]);
+
+  useEffect(() => {
     const onFocus = () => {
       refresh();
     };
     window.addEventListener("focus", onFocus);
-    return () => window.removeEventListener("focus", onFocus);
+    const win = getCurrentWindow();
+    const unlistenPromise = win.onFocusChanged(({ payload: focused }) => {
+      if (focused) refresh();
+    });
+    return () => {
+      window.removeEventListener("focus", onFocus);
+      unlistenPromise.then((unlisten) => unlisten());
+    };
   }, [refresh]);
+
+  const todayLessonNosKey = [...lessonTags.executionLessonNos].sort((a, b) => a - b).join(",");
+
+  useEffect(() => {
+    if (loading || !snapshot?.date || catalog.length === 0 || !todayLessonNosKey) return;
+
+    const scrollKey = `xigui-today-scroll-${snapshot.date}`;
+    if (localStorage.getItem(scrollKey) === "1") return;
+
+    const firstTodayNo = catalog.find((l) =>
+      lessonTags.executionLessonNos.has(l.no),
+    )?.no;
+    if (firstTodayNo == null) return;
+
+    const section = catalogSections(catalog).find((s) =>
+      s.lessons.some((l) => l.no === firstTodayNo),
+    );
+    if (section) {
+      setExpandedSections((prev) => ({ ...prev, [section.id]: true }));
+    }
+
+    const timer = window.setTimeout(() => {
+      const el = panelScrollRef.current?.querySelector(
+        `[data-lesson-no="${firstTodayNo}"]`,
+      );
+      el?.scrollIntoView({ block: "center", behavior: "smooth" });
+      localStorage.setItem(scrollKey, "1");
+    }, 150);
+
+    return () => window.clearTimeout(timer);
+  }, [loading, snapshot?.date, catalog, todayLessonNosKey, lessonTags.executionLessonNos]);
 
   useEffect(() => {
     document.documentElement.classList.add("panel-view");
@@ -687,7 +727,6 @@ export default function TodayPanel() {
       loadPanelMeta(snapshot)
         .then((meta) => {
           setLessonTags(meta.tags);
-          setStageCard(meta.stageCard);
           setStageText(meta.stageText);
           setTodayMarquee(meta.todayText);
           setWenMarquee(meta.wenText);
@@ -763,7 +802,12 @@ export default function TodayPanel() {
   const handleQuiz = async (lesson: CatalogLesson) => {
     setError(null);
     try {
-      await openQuiz(lesson.no);
+      const { chapterKey, done } = await toggleQuizDone(lesson.no);
+      setCatalog((prev) =>
+        prev.map((item) =>
+          item.quizChapterKey === chapterKey ? { ...item, quizDone: done } : item,
+        ),
+      );
     } catch (e) {
       setError(String(e));
     }
@@ -965,13 +1009,9 @@ export default function TodayPanel() {
           </div>
         </div>
 
-        {snapshot && stageCard && (
+        {snapshot && (
           <div className="mb-3">
-            <StageStatusCard
-              card={stageCard}
-              todayProgress={todayProgress}
-              showTodayBar={showTodayBar}
-            />
+            {showTodayBar && todayProgress && <TodayProgressBar progress={todayProgress} />}
             <ProgressHintMarquee
               stageText={stageText}
               todayText={todayMarquee}
@@ -993,7 +1033,10 @@ export default function TodayPanel() {
           </div>
         )}
 
-        <div className="panel-scroll min-h-0 flex-1 space-y-1.5 overflow-x-hidden overflow-y-auto pr-1">
+        <div
+          ref={panelScrollRef}
+          className="panel-scroll min-h-0 flex-1 space-y-1.5 overflow-x-hidden overflow-y-auto pr-1"
+        >
           {loading && <div className="text-sm text-slate-500">加载中…</div>}
           {error && (
             <div className="rounded-xl bg-rose-50 px-3 py-2 text-sm text-rose-600">
@@ -1011,7 +1054,6 @@ export default function TodayPanel() {
                 expanded={expandedSections[section.id] ?? true}
                 onToggle={toggleSection}
                 lessonTags={lessonTags}
-                quizName={quizName}
                 onPlay={handlePlay}
                 onTextbook={handleTextbook}
                 onTricolorNotes={handleTricolorNotes}

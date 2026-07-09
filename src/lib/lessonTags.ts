@@ -1,4 +1,4 @@
-import { getTodayPaceLessonNos } from "./pacePlan";
+import { getTodayPaceDisplayNos } from "./pacePlan";
 import { readDailyStudyHours } from "./studyPace";
 import { getWenHighlight } from "./wenPlan";
 import type { PlanFile } from "./types";
@@ -18,7 +18,7 @@ export function computeLessonTags(
   dailyHours = readDailyStudyHours(),
 ): LessonTagState {
   const wen = getWenHighlight(planWen, today);
-  const todayNos = getTodayPaceLessonNos(plan, progress, today, dailyHours);
+  const todayNos = getTodayPaceDisplayNos(plan, progress, today, dailyHours);
   return {
     wenLessonNos: wen.lessonNos,
     executionLessonNos: new Set(todayNos),

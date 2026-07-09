@@ -36,9 +36,14 @@ export default function App() {
   }, [view]);
 
   useEffect(() => {
-    getCurrentWindow()
-      .setDecorations(view === "player")
-      .catch(() => undefined);
+    const win = getCurrentWindow();
+    if (view === "player") {
+      win.setDecorations(true).catch(() => undefined);
+      win.setTitleBarStyle("overlay").catch(() => undefined);
+      return;
+    }
+    win.setTitleBarStyle("visible").catch(() => undefined);
+    win.setDecorations(view !== "panel" && view !== "subtitle").catch(() => undefined);
   }, [view]);
 
   if (view === "subtitle" && lessonNo) {

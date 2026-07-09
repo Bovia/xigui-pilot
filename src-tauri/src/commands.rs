@@ -1,4 +1,4 @@
-use crate::progress::{progress_path, ProgressStore, VideoProgress};
+use crate::progress::{progress_path, PaceTodayLock, ProgressStore, VideoProgress};
 use crate::settings::{settings_path, Settings};
 use crate::{activate_for_action, close_subtitle_window, ensure_player_window, ensure_subtitle_window, restore_accessory, set_panel_hide_suppressed};
 use chrono::{Local, NaiveDate};
@@ -7,7 +7,7 @@ use serde_json::Value;
 use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
-use tauri::{AppHandle, Manager};
+use tauri::{AppHandle, Emitter, Manager};
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
@@ -353,7 +353,35 @@ pub(crate) fn count_current_week_unwatched(app: &AppHandle) -> Result<u32, Strin
     Ok(count_unwatched_in_tasks(&tasks, &progress))
 }
 
+fn count_pace_today_pending(progress: &ProgressStore) -> Option<u32> {
+    let lock = progress.pace_today.as_ref()?;
+    if lock.date != today_string() {
+        return None;
+    }
+    let count = lock
+        .lesson_nos
+        .iter()
+        .filter(|lesson_no| {
+            let key = lesson_no.to_string();
+            !progress
+                .videos
+                .get(&key)
+                .map(|video| video.completed)
+                .unwrap_or(false)
+        })
+        .count() as u32;
+    Some(count)
+}
+
 pub(crate) fn tray_badge_count(app: &AppHandle) -> Result<TrayBadge, String> {
+    let (_, progress) = progress_for(app)?;
+    if let Some(count) = count_pace_today_pending(&progress) {
+        return Ok(TrayBadge {
+            count,
+            today_scope: true,
+        });
+    }
+
     let plan = load_plan_for(&app)?;
     let today_count = count_today_unwatched(app)?;
     if has_today_video_tasks(&plan) {
@@ -561,6 +589,26 @@ pub fn set_panel_pinned(app: AppHandle, pinned: bool) -> Result<Settings, String
 }
 
 #[tauri::command]
+pub fn get_player_pinned(app: AppHandle) -> Result<bool, String> {
+    let (_, settings) = settings_for(&app)?;
+    Ok(settings.player_pinned())
+}
+
+#[tauri::command]
+pub fn set_player_pinned(
+    app: AppHandle,
+    pinned: bool,
+    lesson_no: Option<u32>,
+) -> Result<Settings, String> {
+    let (path, mut settings) = settings_for(&app)?;
+    settings.player_pinned = Some(pinned);
+    settings.save(&path)?;
+    crate::apply_player_pinned(&app, lesson_no, pinned)?;
+    let _ = app.emit("player-pinned-changed", pinned);
+    Ok(settings)
+}
+
+#[tauri::command]
 pub fn set_woven_style(app: AppHandle, enabled: bool) -> Result<Settings, String> {
     let (path, mut settings) = settings_for(&app)?;
     settings.woven_style = Some(enabled);
@@ -616,6 +664,15 @@ pub fn save_video_progress(
         .insert(lesson_no.to_string(), entry.clone());
     progress.save(&path)?;
     crate::refresh_tray_badge(&app);
+    let _ = app.emit_to(
+        "panel",
+        "video-progress-updated",
+        serde_json::json!({
+            "lessonNo": lesson_no,
+            "position": position,
+            "duration": duration,
+        }),
+    );
     Ok(entry)
 }
 
@@ -921,8 +978,16 @@ pub fn set_floating_subtitles(app: AppHandle, enabled: bool) -> Result<Settings,
                 let _ = window.close();
             }
         }
+    } else {
+        open_subtitles_for_active_players(&app);
     }
     Ok(settings)
+}
+
+fn open_subtitles_for_active_players(app: &AppHandle) {
+    if let Some(lesson_no) = crate::active_player_lesson(app) {
+        let _ = open_subtitle_window(app.clone(), lesson_no);
+    }
 }
 
 #[tauri::command]
@@ -1266,6 +1331,49 @@ fn open_wechat_app() -> Result<(), String> {
     Ok(())
 }
 
+fn quiz_chapter_key(title: &str) -> String {
+    let compact: String = title.chars().filter(|c| !c.is_whitespace()).collect();
+    if compact.starts_with('0') {
+        return "ch0".into();
+    }
+    if let Some(dot) = compact.find('.') {
+        if let Ok(ch) = compact[..dot].parse::<u32>() {
+            if ch > 0 {
+                return format!("ch{ch}");
+            }
+        }
+    }
+    "ch-unknown".into()
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct ToggleQuizResult {
+    pub chapter_key: String,
+    pub done: bool,
+}
+
+#[tauri::command]
+pub fn toggle_quiz_done(app: AppHandle, lesson_no: u32) -> Result<ToggleQuizResult, String> {
+    let plan = load_plan_for(&app)?;
+    let title = plan
+        .get("lessons")
+        .and_then(|v| v.get(lesson_no.to_string()))
+        .and_then(|v| v.get("title"))
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+    let key = quiz_chapter_key(title);
+    let (path, mut progress) = progress_for(&app)?;
+    let current = progress.quiz_done.get(&key).copied().unwrap_or(false);
+    let done = !current;
+    progress.quiz_done.insert(key.clone(), done);
+    progress.save(&path)?;
+    Ok(ToggleQuizResult {
+        chapter_key: key,
+        done,
+    })
+}
+
 #[tauri::command]
 pub fn open_quiz(app: AppHandle, lesson_no: u32) -> Result<QuizOpenResult, String> {
     activate_for_action(&app);
@@ -1304,4 +1412,38 @@ pub fn open_quiz(app: AppHandle, lesson_no: u32) -> Result<QuizOpenResult, Strin
         copied_link: lesson_link.to_string(),
         instruction,
     })
+}
+
+#[tauri::command]
+pub fn sync_pace_today_lock(
+    app: AppHandle,
+    date: String,
+    daily_hours: f64,
+    lesson_nos: Vec<u32>,
+) -> Result<(), String> {
+    let (path, mut progress) = progress_for(&app)?;
+    progress.pace_today = Some(PaceTodayLock {
+        date,
+        daily_hours,
+        lesson_nos,
+    });
+    progress.save(&path)?;
+    crate::refresh_tray_badge(&app);
+    Ok(())
+}
+
+#[tauri::command]
+pub fn set_player_chrome_visible(
+    window: tauri::WebviewWindow,
+    visible: bool,
+) -> Result<(), String> {
+    #[cfg(target_os = "macos")]
+    {
+        return crate::macos_traffic_lights::set_traffic_lights_visible(&window, visible);
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        let _ = (window, visible);
+        Ok(())
+    }
 }

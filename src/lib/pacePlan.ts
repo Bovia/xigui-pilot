@@ -1,7 +1,8 @@
 import type { PlanFile } from "./types";
 import type { PlanLessonRow, ProgressVideos, WeekDayRow } from "./dynamicPlan";
 import { factualLessonsOnDate, todayIso } from "./dynamicPlan";
-import { clampDailyStudyHours } from "./studyPace";
+import { clampDailyStudyHours, PACE_CHANGED_EVENT } from "./studyPace";
+import { syncPaceTodayLock } from "./api";
 
 const WEEKDAY = ["日", "一", "二", "三", "四", "五", "六"];
 const PACE_TODAY_LOCK_KEY = "xigui-pace-today-lock";
@@ -17,6 +18,15 @@ interface PaceTodayLock {
   date: string;
   dailyHours: number;
   lessonNos: number[];
+}
+
+export function activityDate(video: ProgressVideos[string] | undefined): string | undefined {
+  if (!video) return undefined;
+  if (video.last_activity_date) return video.last_activity_date;
+  if (video.updated_at && video.updated_at.length >= 10) {
+    return video.updated_at.slice(0, 10);
+  }
+  return undefined;
 }
 
 function parseLocalDate(iso: string) {
@@ -46,8 +56,28 @@ function datesBetween(start: string, end: string) {
   return out;
 }
 
-function isLessonDone(lessonNo: number, progress: ProgressVideos) {
+export function isLessonDone(lessonNo: number, progress: ProgressVideos) {
   return progress[String(lessonNo)]?.completed ?? false;
+}
+
+/** 某天是否展示：!completed || (completed && 活动日==当天) */
+export function lessonShownOnDate(
+  lessonNo: number,
+  progress: ProgressVideos,
+  date: string,
+): boolean {
+  const video = progress[String(lessonNo)];
+  const done = video?.completed ?? false;
+  if (!done) return true;
+  return activityDate(video) === date;
+}
+
+export function filterVisibleOnDate(
+  lessonNos: number[],
+  progress: ProgressVideos,
+  date: string,
+) {
+  return lessonNos.filter((no) => lessonShownOnDate(no, progress, date));
 }
 
 export function catalogLessonList(plan: PlanFile): CatalogLessonMeta[] {
@@ -80,11 +110,30 @@ function writePaceTodayLock(lock: PaceTodayLock) {
   localStorage.setItem(PACE_TODAY_LOCK_KEY, JSON.stringify(lock));
 }
 
+function persistPaceTodayLock(lock: PaceTodayLock) {
+  writePaceTodayLock(lock);
+  syncPaceTodayLock(lock.date, lock.dailyHours, lock.lessonNos).catch(() => undefined);
+}
+
+export function clearPaceTodayLock() {
+  localStorage.removeItem(PACE_TODAY_LOCK_KEY);
+}
+
 function clearPaceTodayLockIfStale(today: string) {
   const lock = readPaceTodayLock();
   if (lock && lock.date !== today) {
-    localStorage.removeItem(PACE_TODAY_LOCK_KEY);
+    clearPaceTodayLock();
   }
+}
+
+function validateLock(
+  lock: PaceTodayLock | null,
+  progress: ProgressVideos,
+  today: string,
+  dailyHours: number,
+): lock is PaceTodayLock {
+  if (!lock || lock.date !== today || lock.dailyHours !== dailyHours) return false;
+  return lock.lessonNos.every((no) => lessonShownOnDate(no, progress, today));
 }
 
 function rowsFromCatalog(
@@ -148,7 +197,6 @@ export function weekRangeForDate(today: string) {
   return { start: formatIso(mon), end: formatIso(sun) };
 }
 
-/** 对指定队列模拟工作日排课，返回完成日期 */
 export function estimateQueueFinishDate(
   queue: CatalogLessonMeta[],
   today: string,
@@ -186,7 +234,8 @@ export function estimateFinishDate(
   return estimateQueueFinishDate(queue, today, dailyHours);
 }
 
-export function getTodayPaceLessonNos(
+/** 写入今日契约（立即生效） */
+export function applyTodayPacePlan(
   plan: PlanFile,
   progress: ProgressVideos,
   today: string,
@@ -195,19 +244,78 @@ export function getTodayPaceLessonNos(
   clearPaceTodayLockIfStale(today);
   const hours = clampDailyStudyHours(dailyHours);
   const queue = incompleteCatalogQueue(plan, progress);
-  if (queue.length === 0) return [];
-
-  const existing = readPaceTodayLock();
-  if (existing?.date === today && existing.dailyHours === hours) {
-    const head = queue[0]?.lessonNo;
-    if (head != null && existing.lessonNos.includes(head)) {
-      return existing.lessonNos;
-    }
-  }
-
   const { lessonNos } = packLessonsForDay(queue, hours);
-  writePaceTodayLock({ date: today, dailyHours: hours, lessonNos });
+  persistPaceTodayLock({ date: today, dailyHours: hours, lessonNos });
+  window.dispatchEvent(new CustomEvent(PACE_CHANGED_EVENT, { detail: { applied: true } }));
   return lessonNos;
+}
+
+function ensureTodayContract(
+  plan: PlanFile,
+  progress: ProgressVideos,
+  today: string,
+  dailyHours: number,
+  createIfMissing: boolean,
+): number[] | null {
+  clearPaceTodayLockIfStale(today);
+  const hours = clampDailyStudyHours(dailyHours);
+  const existing = readPaceTodayLock();
+  if (validateLock(existing, progress, today, hours)) {
+    return existing.lessonNos;
+  }
+  if (!createIfMissing) return null;
+  const queue = incompleteCatalogQueue(plan, progress);
+  if (queue.length === 0) return [];
+  const { lessonNos } = packLessonsForDay(queue, hours);
+  persistPaceTodayLock({ date: today, dailyHours: hours, lessonNos });
+  return lessonNos;
+}
+
+/** 今日契约课节（含已完成但今天学的） */
+export function getTodayPaceContract(
+  plan: PlanFile,
+  progress: ProgressVideos,
+  today: string,
+  dailyHours: number,
+): number[] {
+  return ensureTodayContract(plan, progress, today, dailyHours, true) ?? [];
+}
+
+/** 今日展示列表：契约 ∩ 展示规则 */
+export function getTodayPaceDisplayNos(
+  plan: PlanFile,
+  progress: ProgressVideos,
+  today: string,
+  dailyHours: number,
+): number[] {
+  const contract = getTodayPaceContract(plan, progress, today, dailyHours);
+  return filterVisibleOnDate(contract, progress, today);
+}
+
+/** 今日待办（打「今天」tag）：契约内未完成 */
+export function getTodayPacePendingNos(
+  plan: PlanFile,
+  progress: ProgressVideos,
+  today: string,
+  dailyHours: number,
+): number[] {
+  const contract = getTodayPaceContract(plan, progress, today, dailyHours);
+  return contract.filter((no) => !isLessonDone(no, progress));
+}
+
+/** @deprecated 使用 getTodayPacePendingNos / getTodayPaceDisplayNos */
+export function getTodayPaceLessonNos(
+  plan: PlanFile,
+  progress: ProgressVideos,
+  today: string,
+  dailyHours: number,
+): number[] {
+  return getTodayPacePendingNos(plan, progress, today, dailyHours);
+}
+
+function removeFromQueue(queue: CatalogLessonMeta[], lessonNos: number[]) {
+  const remove = new Set(lessonNos);
+  return queue.filter((l) => !remove.has(l.lessonNo));
 }
 
 export function buildPaceWeekDailyPlan(
@@ -215,12 +323,19 @@ export function buildPaceWeekDailyPlan(
   progress: ProgressVideos,
   today: string,
   dailyHours: number,
+  options?: { useLock?: boolean },
 ): WeekDayRow[] {
   const hours = clampDailyStudyHours(dailyHours);
+  const useLock = options?.useLock ?? false;
   const allLessons = catalogLessonList(plan);
   const { start, end } = weekRangeForDate(today);
-  const queue = [...incompleteCatalogQueue(plan, progress)];
-  const queueExhaustedAtStart = queue.length === 0;
+  let simQueue = [...incompleteCatalogQueue(plan, progress)];
+  const queueExhaustedAtStart = simQueue.length === 0;
+
+  const todayContract =
+    useLock && !queueExhaustedAtStart
+      ? ensureTodayContract(plan, progress, today, hours, true) ?? []
+      : null;
 
   return datesBetween(start, end).map((date) => {
     const d = parseLocalDate(date);
@@ -241,7 +356,9 @@ export function buildPaceWeekDailyPlan(
     }
 
     if (isPast) {
-      const lessons = factualLessonsOnDate(plan, progress, date);
+      const lessons = factualLessonsOnDate(plan, progress, date).filter((l) =>
+        lessonShownOnDate(l.lessonNo, progress, date),
+      );
       return {
         date,
         weekday: WEEKDAY[d.getDay()],
@@ -253,8 +370,29 @@ export function buildPaceWeekDailyPlan(
       };
     }
 
-    const { lessonNos, consumed } = packLessonsForDay(queue, hours);
-    queue.splice(0, consumed);
+    if (isToday && todayContract) {
+      const displayNos = filterVisibleOnDate(todayContract, progress, today);
+      const pending = displayNos.filter((no) => !isLessonDone(no, progress));
+      simQueue = removeFromQueue(simQueue, pending);
+      const lessons = rowsFromCatalog(allLessons, progress, displayNos);
+      return {
+        date,
+        weekday: WEEKDAY[d.getDay()],
+        isWeekend: false,
+        isToday,
+        isPast: false,
+        lessons,
+        note:
+          lessons.length === 0
+            ? queueExhaustedAtStart
+              ? "录播已全部完成"
+              : "—"
+            : undefined,
+      };
+    }
+
+    const { lessonNos, consumed } = packLessonsForDay(simQueue, hours);
+    simQueue = simQueue.slice(consumed);
     const lessons = rowsFromCatalog(allLessons, progress, lessonNos);
 
     return {
@@ -298,19 +436,23 @@ export function formatTodayMarquee(
   today: string,
   dailyHours: number,
 ): string {
-  const nos = getTodayPaceLessonNos(plan, progress, today, dailyHours);
-  if (nos.length === 0) {
+  const display = getTodayPaceDisplayNos(plan, progress, today, dailyHours);
+  const pending = getTodayPacePendingNos(plan, progress, today, dailyHours);
+  if (display.length === 0) {
     return paceStatus(plan, progress).remaining === 0 ? "录播已全部完成" : "今日无安排";
   }
   const titles = catalogLessonList(plan);
   const byNo = new Map(titles.map((l) => [l.lessonNo, l]));
-  const parts = nos.map((no) => {
+  const parts = (pending.length > 0 ? pending : display).map((no) => {
     const t = byNo.get(no);
     return t ? `[${no}] ${t.title}` : `[${no}]`;
   });
   const hours =
-    nos.reduce((s, no) => s + (byNo.get(no)?.durationSec ?? 0), 0) / 3600;
-  return `${parts.join(" · ")}（约 ${hours.toFixed(1)}h）`;
+    display.reduce((s, no) => s + (byNo.get(no)?.durationSec ?? 0), 0) / 3600;
+  const done = display.length - pending.length;
+  const suffix =
+    done > 0 ? `（待办 ${pending.length} 节 · 约 ${hours.toFixed(1)}h）` : `（约 ${hours.toFixed(1)}h）`;
+  return `${parts.join(" · ")}${suffix}`;
 }
 
 export type TodayPlanProgress = {
@@ -322,28 +464,25 @@ export type TodayPlanProgress = {
   lessonPct: number;
 };
 
-/** 阶段一今日任务进度（按今日计划课节） */
 export function computeTodayPlanProgress(
   plan: PlanFile,
   progress: ProgressVideos,
   today: string,
   dailyHours: number,
 ): TodayPlanProgress | null {
-  const nos = getTodayPaceLessonNos(plan, progress, today, dailyHours);
-  if (nos.length === 0) return null;
+  const display = getTodayPaceDisplayNos(plan, progress, today, dailyHours);
+  if (display.length === 0) return null;
 
   const byNo = new Map(catalogLessonList(plan).map((l) => [l.lessonNo, l]));
   let lessonDone = 0;
   let plannedSec = 0;
   let watchedSec = 0;
 
-  for (const no of nos) {
+  for (const no of display) {
     const meta = byNo.get(no);
     const video = progress[String(no)];
     const dur =
-      (meta?.durationSec ?? 0) > 0
-        ? meta!.durationSec
-        : video?.duration ?? 45 * 60;
+      (meta?.durationSec ?? 0) > 0 ? meta!.durationSec : video?.duration ?? 45 * 60;
     plannedSec += dur;
     if (video?.completed) {
       lessonDone += 1;
@@ -355,12 +494,13 @@ export function computeTodayPlanProgress(
 
   const plannedHours = plannedSec / 3600;
   const watchedHours = watchedSec / 3600;
-  const timePct = plannedSec > 0 ? Math.min(100, Math.round((watchedSec / plannedSec) * 100)) : 0;
+  const timePct =
+    plannedSec > 0 ? Math.min(100, Math.round((watchedSec / plannedSec) * 100)) : 0;
   const lessonPct =
-    nos.length > 0 ? Math.round((lessonDone / nos.length) * 100) : 0;
+    display.length > 0 ? Math.round((lessonDone / display.length) * 100) : 0;
 
   return {
-    lessonTotal: nos.length,
+    lessonTotal: display.length,
     lessonDone,
     plannedHours,
     watchedHours,

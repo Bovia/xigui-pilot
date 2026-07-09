@@ -37,6 +37,7 @@ export interface Settings {
   textbookDir?: string | null;
   tricolorNotesDir?: string | null;
   panelPinned?: boolean | null;
+  playerPinned?: boolean | null;
   wovenStyle?: boolean | null;
   planVariant?: string | null;
   floatingSubtitles?: boolean | null;
@@ -62,6 +63,8 @@ export interface CatalogLesson {
   duration: number;
   completed: boolean;
   textbookPage?: number;
+  quizChapterKey?: string;
+  quizDone?: boolean;
 }
 
 export interface TextbookFile {

@@ -119,6 +119,20 @@ export const getPanelPinned = () => invoke<boolean>("get_panel_pinned");
 export const setPanelPinned = (pinned: boolean) =>
   invoke<Settings>("set_panel_pinned", { pinned });
 
+export const getPlayerPinned = () => invoke<boolean>("get_player_pinned");
+
+export const setPlayerPinned = (pinned: boolean, lessonNo?: number) =>
+  invoke<Settings>("set_player_pinned", { pinned, lessonNo });
+
+export const setPlayerChromeVisible = (visible: boolean) =>
+  invoke<void>("set_player_chrome_visible", { visible });
+
+export const syncPaceTodayLock = (
+  date: string,
+  dailyHours: number,
+  lessonNos: number[],
+) => invoke<void>("sync_pace_today_lock", { date, dailyHours, lessonNos });
+
 export const setWovenStyle = (enabled: boolean) =>
   invoke<Settings>("set_woven_style", { enabled });
 
@@ -128,6 +142,7 @@ export const getProgress = () =>
       string,
       { position: number; duration: number; completed: boolean }
     >;
+    quiz_done?: Record<string, boolean>;
   }>("get_progress");
 
 export const getLiveCatalog = () =>
@@ -162,6 +177,9 @@ export const openTextbook = (lessonNo: number) =>
 
 export const openTricolorNotes = (lessonNo: number) =>
   invoke<{ path: string; chapter?: number }>("open_tricolor_notes", { lessonNo });
+
+export const toggleQuizDone = (lessonNo: number) =>
+  invoke<{ chapterKey: string; done: boolean }>("toggle_quiz_done", { lessonNo });
 
 export const openQuiz = (lessonNo: number) =>
   invoke<{

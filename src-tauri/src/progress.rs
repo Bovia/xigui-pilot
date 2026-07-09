@@ -15,9 +15,20 @@ pub struct VideoProgress {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct PaceTodayLock {
+    pub date: String,
+    pub daily_hours: f64,
+    pub lesson_nos: Vec<u32>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct ProgressStore {
     pub videos: HashMap<String, VideoProgress>,
     pub tasks: HashMap<String, bool>,
+    #[serde(default, skip_serializing_if = "HashMap::is_empty")]
+    pub quiz_done: HashMap<String, bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pace_today: Option<PaceTodayLock>,
 }
 
 impl ProgressStore {

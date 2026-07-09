@@ -1,4 +1,6 @@
 mod commands;
+#[cfg(target_os = "macos")]
+mod macos_traffic_lights;
 mod progress;
 mod settings;
 
@@ -6,14 +8,19 @@ use std::sync::Mutex;
 
 use tauri::{
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
-    ActivationPolicy, AppHandle, Emitter, Manager, RunEvent, WebviewUrl, WebviewWindowBuilder,
+    ActivationPolicy, AppHandle, Emitter, Manager, RunEvent, TitleBarStyle, WebviewUrl,
+    WebviewWindowBuilder,
 };
 use tauri_plugin_positioner::{on_tray_event, Position, WindowExt};
 
 pub struct AppState {
     pub suppress_panel_hide: Mutex<bool>,
     pub tray_id: tauri::tray::TrayIconId,
+    pub active_player_lesson: Mutex<Option<u32>>,
 }
+
+/// 全局唯一播放器窗口（所有课节共用，切集只换片源）
+pub const PLAYER_WINDOW_LABEL: &str = "player";
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -45,6 +52,7 @@ pub fn run() {
             app.manage(AppState {
                 suppress_panel_hide: Mutex::new(false),
                 tray_id: tray.id().clone(),
+                active_player_lesson: Mutex::new(None),
             });
 
             refresh_tray_badge(app.handle());
@@ -73,15 +81,20 @@ pub fn run() {
             commands::open_plan_spreadsheet,
             commands::open_textbook,
             commands::open_tricolor_notes,
+            commands::toggle_quiz_done,
             commands::open_quiz,
             commands::get_panel_pinned,
             commands::set_panel_pinned,
+            commands::get_player_pinned,
+            commands::set_player_pinned,
             commands::set_woven_style,
             commands::set_plan_variant,
             commands::set_floating_subtitles,
             commands::resolve_subtitle_path,
             commands::open_subtitle_window,
             commands::close_subtitle_window_cmd,
+            commands::sync_pace_today_lock,
+            commands::set_player_chrome_visible,
             commands::quit_app,
         ])
         .build(tauri::generate_context!())
@@ -103,6 +116,22 @@ pub fn run() {
                         if let Some(window) = app.get_webview_window("panel") {
                             let _ = window.hide();
                             restore_accessory(&app);
+                        }
+                    }
+                }
+                RunEvent::WindowEvent { label, event, .. } if label == PLAYER_WINDOW_LABEL => {
+                    if matches!(
+                        event,
+                        tauri::WindowEvent::CloseRequested { .. }
+                            | tauri::WindowEvent::Destroyed
+                    ) {
+                        if let Ok(guard) = app.state::<AppState>().active_player_lesson.lock() {
+                            if let Some(lesson_no) = *guard {
+                                close_subtitle_window(&app, lesson_no);
+                            }
+                        }
+                        if let Ok(mut guard) = app.state::<AppState>().active_player_lesson.lock() {
+                            *guard = None;
                         }
                     }
                 }
@@ -157,6 +186,43 @@ pub fn apply_panel_pinned(app: &AppHandle, pinned: bool) -> Result<(), String> {
         .map_err(|e| e.to_string())
 }
 
+pub fn set_active_player_lesson(app: &AppHandle, lesson_no: u32) {
+    if let Ok(mut guard) = app.state::<AppState>().active_player_lesson.lock() {
+        *guard = Some(lesson_no);
+    }
+}
+
+pub fn active_player_lesson(app: &AppHandle) -> Option<u32> {
+    app.state::<AppState>()
+        .active_player_lesson
+        .lock()
+        .ok()
+        .and_then(|g| *g)
+}
+
+fn close_legacy_player_windows(app: &AppHandle) {
+    let labels: Vec<String> = app
+        .webview_windows()
+        .keys()
+        .filter(|label| label.starts_with("player-"))
+        .cloned()
+        .collect();
+    for label in labels {
+        if let Some(window) = app.get_webview_window(&label) {
+            let _ = window.close();
+        }
+    }
+}
+
+pub fn apply_player_pinned(app: &AppHandle, _lesson_no: Option<u32>, pinned: bool) -> Result<(), String> {
+    if let Some(window) = app.get_webview_window(PLAYER_WINDOW_LABEL) {
+        window
+            .set_always_on_top(pinned)
+            .map_err(|e| e.to_string())?;
+    }
+    Ok(())
+}
+
 pub fn panel_should_stay_visible(app: &AppHandle) -> bool {
     commands::settings_for(app)
         .map(|(_, settings)| settings.panel_pinned())
@@ -208,25 +274,42 @@ fn toggle_panel(app: &AppHandle) {
 
 pub fn ensure_player_window(app: &AppHandle, lesson_no: u32) -> Result<(), String> {
     activate_for_action(app);
-    let label = format!("player-{lesson_no}");
+    close_legacy_player_windows(app);
+    set_active_player_lesson(app, lesson_no);
 
-    if let Some(window) = app.get_webview_window(&label) {
+    if let Some(window) = app.get_webview_window(PLAYER_WINDOW_LABEL) {
+        let title = format!("第{lesson_no}节");
+        let _ = window.set_title(&title);
         let _ = window.show();
         let _ = window.set_focus();
         let _ = window.emit("player-open", lesson_no);
         return Ok(());
     }
 
+    let pinned = commands::settings_for(app)
+        .map(|(_, settings)| settings.player_pinned())
+        .unwrap_or(true);
+
     let url = WebviewUrl::App(format!("index.html?view=player&lesson={lesson_no}").into());
-    WebviewWindowBuilder::new(app, &label, url)
+    let mut builder = WebviewWindowBuilder::new(app, PLAYER_WINDOW_LABEL, url)
         .title(format!("第{lesson_no}节"))
-        .inner_size(480.0, 300.0)
-        .min_inner_size(360.0, 220.0)
+        .inner_size(640.0, 360.0)
+        .min_inner_size(360.0, 202.0)
         .decorations(true)
-        .always_on_top(true)
-        .resizable(true)
-        .build()
-        .map_err(|e| e.to_string())?;
+        .title_bar_style(TitleBarStyle::Overlay)
+        .always_on_top(pinned)
+        .resizable(true);
+
+    #[cfg(target_os = "macos")]
+    {
+        use tauri::LogicalPosition;
+        use crate::macos_traffic_lights::TRAFFIC_LIGHT_Y;
+        builder = builder
+            .hidden_title(true)
+            .traffic_light_position(LogicalPosition::new(-80.0, TRAFFIC_LIGHT_Y));
+    }
+
+    builder.build().map_err(|e| e.to_string())?;
 
     Ok(())
 }
@@ -243,6 +326,7 @@ pub fn ensure_subtitle_window(app: &AppHandle, lesson_no: u32) -> Result<(), Str
 
     if let Some(window) = app.get_webview_window(&label) {
         let _ = window.show();
+        let _ = window.set_always_on_top(true);
         let _ = window.emit("subtitle-open", lesson_no);
         return Ok(());
     }

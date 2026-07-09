@@ -1,100 +1,50 @@
-import type { ProgressVideos } from "./dynamicPlan";
-import {
-  catalogLessonList,
-  estimateQueueFinishDate,
-  type CatalogLessonMeta,
-} from "./pacePlan";
 import type { PlanFile } from "./types";
 
-function isLessonDone(lessonNo: number, progress: ProgressVideos) {
-  return progress[String(lessonNo)]?.completed ?? false;
-}
-
-/** 文老师课表中，scheduledDate ≤ today 应完成的录播课节 */
-export function wenLessonsDueByDate(planWen: PlanFile, today: string): number[] {
-  const seen = new Set<number>();
-  const nos: number[] = [];
+/** 文老师课表中最后一节录播的 scheduledDate */
+export function wenRecordingFinishDate(planWen: PlanFile): string | null {
+  let max: string | null = null;
   for (const week of planWen.weeks ?? []) {
     for (const task of week.tasks ?? []) {
-      if (task.lessonNo == null || !task.scheduledDate) continue;
-      if (task.scheduledDate > today || seen.has(task.lessonNo)) continue;
-      seen.add(task.lessonNo);
-      nos.push(task.lessonNo);
+      if (!task.scheduledDate) continue;
+      if (!max || task.scheduledDate > max) max = task.scheduledDate;
     }
   }
-  return nos.sort((a, b) => a - b);
+  return max;
 }
 
-export type WenCatchUpStatus = {
-  wenDueCount: number;
-  alignedCount: number;
-  behindCount: number;
-  aheadCount: number;
-  behindHours: number;
-  catchUpDate: string | null;
+function daysBetween(from: string, to: string) {
+  const a = new Date(`${from}T00:00:00`).getTime();
+  const b = new Date(`${to}T00:00:00`).getTime();
+  return Math.round((b - a) / 86_400_000);
+}
+
+/** 预计刷完日 ≤ 文老师课表完结日 → 能赶上 */
+export function canKeepUpWithWen(
+  userFinish: string | null,
+  wenFinish: string | null,
+): boolean | null {
+  if (!wenFinish) return null;
+  if (!userFinish) return true;
+  return daysBetween(userFinish, wenFinish) >= 0;
+}
+
+export type PaceVsWen = {
+  text: string;
+  canKeepUp: boolean;
 };
 
-export function computeWenCatchUp(
-  plan: PlanFile,
-  planWen: PlanFile,
-  progress: ProgressVideos,
-  today: string,
-  dailyHours: number,
-): WenCatchUpStatus {
-  const due = wenLessonsDueByDate(planWen, today);
-  const catalog = catalogLessonList(plan);
-  const byNo = new Map(catalog.map((l) => [l.lessonNo, l]));
-
-  const behindNos = due.filter((no) => !isLessonDone(no, progress));
-  const alignedCount = due.length - behindNos.length;
-  const totalDone = catalog.filter((l) => isLessonDone(l.lessonNo, progress)).length;
-  const aheadCount = behindNos.length === 0 ? Math.max(0, totalDone - due.length) : 0;
-
-  const behindQueue: CatalogLessonMeta[] = behindNos.map((no) => {
-    const meta = byNo.get(no);
-    return (
-      meta ?? {
-        lessonNo: no,
-        title: `第 ${no} 节`,
-        missing: false,
-        durationSec: 45 * 60,
-      }
-    );
-  });
-
-  const behindHours =
-    behindQueue.reduce((s, l) => s + (l.durationSec > 0 ? l.durationSec : 45 * 60), 0) / 3600;
-
-  const catchUpDate =
-    behindNos.length > 0
-      ? estimateQueueFinishDate(behindQueue, today, dailyHours)
-      : null;
-
-  return {
-    wenDueCount: due.length,
-    alignedCount,
-    behindCount: behindNos.length,
-    aheadCount,
-    behindHours,
-    catchUpDate,
-  };
-}
-
-export function formatWenCatchUpLine(
-  status: WenCatchUpStatus,
+/** 能赶上 / 赶不上（对照文老师课表完结日） */
+export function formatPaceVsWen(
+  userFinish: string | null,
+  wenFinish: string | null,
   formatDay: (iso: string) => string,
-): string {
-  if (status.wenDueCount === 0) {
-    return "文老师课表今日暂无应完成录播";
-  }
-  if (status.behindCount > 0) {
-    const datePart = status.catchUpDate
-      ? ` · 预计 ${formatDay(status.catchUpDate)} 赶上`
-      : "";
-    return `文老师进度 ${status.wenDueCount} 节 · 落后 ${status.behindCount} 节（约 ${status.behindHours.toFixed(1)}h）${datePart}`;
-  }
-  if (status.aheadCount > 0) {
-    return `文老师进度 ${status.wenDueCount} 节 · 已超前 ${status.aheadCount} 节`;
-  }
-  return `文老师进度 ${status.wenDueCount} 节 · 已对齐`;
+): PaceVsWen | null {
+  if (!wenFinish) return null;
+  const canKeepUp = canKeepUpWithWen(userFinish, wenFinish);
+  if (canKeepUp == null) return null;
+  const wenLabel = formatDay(wenFinish);
+  return {
+    canKeepUp,
+    text: canKeepUp ? "能赶上" : `赶不上(文${wenLabel})`,
+  };
 }

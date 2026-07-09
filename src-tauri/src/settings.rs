@@ -13,6 +13,8 @@ pub struct Settings {
     #[serde(default)]
     pub panel_pinned: Option<bool>,
     #[serde(default)]
+    pub player_pinned: Option<bool>,
+    #[serde(default)]
     pub woven_style: Option<bool>,
     #[serde(default)]
     pub plan_variant: Option<String>,
@@ -27,6 +29,7 @@ impl Default for Settings {
             textbook_dir: None,
             tricolor_notes_dir: None,
             panel_pinned: Some(true),
+            player_pinned: Some(true),
             woven_style: Some(false),
             plan_variant: Some("v2".into()),
             floating_subtitles: Some(true),
@@ -37,6 +40,10 @@ impl Default for Settings {
 impl Settings {
     pub fn panel_pinned(&self) -> bool {
         self.panel_pinned.unwrap_or(true)
+    }
+
+    pub fn player_pinned(&self) -> bool {
+        self.player_pinned.unwrap_or(true)
     }
 
     pub fn floating_subtitles(&self) -> bool {

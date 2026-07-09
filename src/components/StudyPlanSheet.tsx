@@ -2,8 +2,14 @@ import { useEffect, useMemo, useState } from "react";
 import { getProgress, loadPlan } from "../lib/api";
 import CloseButton from "./CloseButton";
 import PlanTableModal from "./PlanTableModal";
-import { buildPaceWeekDailyPlan, estimateFinishDate, paceStatus, todayIso } from "../lib/pacePlan";
-import { computeWenCatchUp, formatWenCatchUpLine } from "../lib/wenCatchUp";
+import {
+  applyTodayPacePlan,
+  buildPaceWeekDailyPlan,
+  estimateFinishDate,
+  paceStatus,
+  todayIso,
+} from "../lib/pacePlan";
+import { formatPaceVsWen, wenRecordingFinishDate } from "../lib/wenCatchUp";
 import {
   PACE_HOURS_MAX,
   PACE_HOURS_MIN,
@@ -22,8 +28,7 @@ function formatDay(iso: string) {
 }
 
 function formatProgressLine(st: ReturnType<typeof paceStatus>) {
-  if (st.remaining === 0) return "已全部完成";
-  if (st.nextLesson) return `${st.done}/${st.total} · 下节 ${st.nextLesson.no}`;
+  if (st.remaining === 0) return "已完成";
   return `${st.done}/${st.total}`;
 }
 
@@ -36,20 +41,24 @@ export default function StudyPlanSheet({
   onClose: () => void;
   daysToExam?: number;
 }) {
-  const [savedHours, setSavedHours] = useState(readDailyStudyHours);
+  const [appliedHours, setAppliedHours] = useState(readDailyStudyHours);
   const [previewHours, setPreviewHours] = useState<number | null>(null);
   const [weekDaily, setWeekDaily] = useState<WeekDayRow[]>([]);
   const [examDate, setExamDate] = useState<string | null>(null);
   const [progressLine, setProgressLine] = useState("");
   const [finishDate, setFinishDate] = useState<string | null>(null);
-  const [wenCatchUpLine, setWenCatchUpLine] = useState("");
+  const [wenFinishDate, setWenFinishDate] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [tableOpen, setTableOpen] = useState(false);
 
   const today = useMemo(() => todayIso(), [open]);
-  const activeHours = previewHours ?? savedHours;
-  const isPreview = previewHours != null && previewHours !== savedHours;
+  const activeHours = previewHours ?? appliedHours;
+  const isPreview = previewHours != null && previewHours !== appliedHours;
+  const paceVsWen = useMemo(
+    () => formatPaceVsWen(finishDate, wenFinishDate, formatDay),
+    [finishDate, wenFinishDate],
+  );
 
   useEffect(() => {
     if (!open) {
@@ -57,11 +66,11 @@ export default function StudyPlanSheet({
       setPreviewHours(null);
       return;
     }
-    setSavedHours(readDailyStudyHours());
+    setAppliedHours(readDailyStudyHours());
   }, [open]);
 
   useEffect(() => {
-    const onPace = () => setSavedHours(readDailyStudyHours());
+    const onPace = () => setAppliedHours(readDailyStudyHours());
     window.addEventListener(PACE_CHANGED_EVENT, onPace);
     return () => window.removeEventListener(PACE_CHANGED_EVENT, onPace);
   }, []);
@@ -77,29 +86,41 @@ export default function StudyPlanSheet({
     ])
       .then(([plan, planWen, progress]) => {
         setExamDate(plan.examDate ?? null);
-        setWeekDaily(buildPaceWeekDailyPlan(plan, progress.videos, today, activeHours));
-        setFinishDate(estimateFinishDate(plan, progress.videos, today, activeHours));
-        setProgressLine(formatProgressLine(paceStatus(plan, progress.videos)));
-        const wenStatus = computeWenCatchUp(
-          plan,
-          planWen,
-          progress.videos,
-          today,
-          activeHours,
+        setWeekDaily(
+          buildPaceWeekDailyPlan(plan, progress.videos, today, activeHours, {
+            useLock: !isPreview,
+          }),
         );
-        setWenCatchUpLine(formatWenCatchUpLine(wenStatus, formatDay));
+        const finish = estimateFinishDate(plan, progress.videos, today, activeHours);
+        setFinishDate(finish);
+        setWenFinishDate(wenRecordingFinishDate(planWen));
+        setProgressLine(formatProgressLine(paceStatus(plan, progress.videos)));
       })
       .catch((e) => {
         setWeekDaily([]);
         setError(e instanceof Error ? e.message : String(e));
       })
       .finally(() => setLoading(false));
-  }, [open, today, activeHours]);
+  }, [open, today, activeHours, isPreview]);
 
-  const commitHours = (hours: number) => {
+  const applyNow = () => {
+    const hours = activeHours;
     writeDailyStudyHours(hours);
-    setSavedHours(hours);
+    setAppliedHours(hours);
     setPreviewHours(null);
+    Promise.all([loadPlan("default") as Promise<PlanFile>, getProgress()]).then(
+      ([plan, progress]) => {
+        applyTodayPacePlan(plan, progress.videos, today, hours);
+        setWeekDaily(
+          buildPaceWeekDailyPlan(plan, progress.videos, today, hours, { useLock: true }),
+        );
+        setFinishDate(estimateFinishDate(plan, progress.videos, today, hours));
+      },
+    );
+  };
+
+  const previewOnly = (hours: number) => {
+    setPreviewHours(hours);
   };
 
   if (!open) return null;
@@ -118,8 +139,8 @@ export default function StudyPlanSheet({
             <div className="min-w-0">
               <h2 className="text-[15px] font-semibold text-slate-900">2026 学习计划表</h2>
               <p className="mt-1 text-[11px] text-slate-500">
-                {examDate && `考试 ${examDate.replace(/-/g, "/")}`}
-                {daysToExam != null && daysToExam >= 0 && ` · 剩 ${daysToExam} 天`}
+                {examDate && `考 ${examDate.replace(/-/g, "/").replace(/^\d{4}\//, "")}`}
+                {daysToExam != null && daysToExam >= 0 && ` · 剩${daysToExam}天`}
                 {progressLine && ` · ${progressLine}`}
               </p>
             </div>
@@ -138,9 +159,9 @@ export default function StudyPlanSheet({
 
           <div className="mb-3 rounded-xl border border-slate-200/80 bg-slate-50/60 px-3 py-2.5">
             <div className="flex items-center justify-between gap-2">
-              <span className="text-[12px] font-medium text-slate-700">每天学习时长</span>
+              <span className="text-[12px] font-medium text-slate-700">每日时长</span>
               <span className="text-[12px] font-semibold tabular-nums text-slate-900">
-                {activeHours.toFixed(1)} 小时
+                {activeHours.toFixed(1)}h
               </span>
             </div>
             <input
@@ -149,13 +170,7 @@ export default function StudyPlanSheet({
               max={PACE_HOURS_MAX}
               step={PACE_HOURS_STEP}
               value={activeHours}
-              onChange={(e) => setPreviewHours(Number(e.target.value))}
-              onPointerUp={() => {
-                if (previewHours != null) commitHours(previewHours);
-              }}
-              onKeyUp={(e) => {
-                if (e.key === "Enter" && previewHours != null) commitHours(previewHours);
-              }}
+              onChange={(e) => previewOnly(Number(e.target.value))}
               className="study-pace-slider mt-2 w-full"
               aria-label="每天学习时长"
             />
@@ -164,31 +179,57 @@ export default function StudyPlanSheet({
                 <button
                   key={preset.label}
                   type="button"
-                  onClick={() => commitHours(preset.hours)}
+                  onClick={() => previewOnly(preset.hours)}
                   className={`rounded-lg px-2 py-0.5 text-[10px] font-medium transition ${
-                    savedHours === preset.hours && !isPreview
+                    appliedHours === preset.hours && !isPreview
                       ? "bg-blue-600 text-white"
                       : "bg-white text-slate-600 ring-1 ring-slate-200 hover:bg-slate-50"
                   }`}
                 >
-                  {preset.label} {preset.hours}h
+                  {preset.hours}h
                 </button>
               ))}
+              <button
+                type="button"
+                onClick={applyNow}
+                className={`ml-auto rounded-lg px-2.5 py-1 text-[10px] font-semibold transition ${
+                  isPreview
+                    ? "bg-blue-600 text-white hover:bg-blue-700"
+                    : "bg-slate-700 text-white hover:bg-slate-800"
+                }`}
+              >
+                生效
+              </button>
             </div>
             <p className="mt-2 text-[10px] leading-5 text-slate-500">
               {finishDate ? (
                 <>
-                  预计 <span className="font-medium text-slate-700">{formatDay(finishDate)}</span>{" "}
-                  刷完剩余录播
+                  <span className="font-medium text-slate-700">{formatDay(finishDate)}</span> 刷完
                 </>
               ) : (
-                "录播已全部完成"
+                "已全部完成"
               )}
-              {isPreview && <span className="text-blue-600"> · 预览中</span>}
+              {paceVsWen && (
+                <span
+                  title={
+                    wenFinishDate
+                      ? `文老师课表最后一节 ${formatDay(wenFinishDate)}`
+                      : undefined
+                  }
+                  className={
+                    paceVsWen.canKeepUp ? "font-medium text-emerald-600" : "font-medium text-rose-600"
+                  }
+                >
+                  {" "}
+                  · {paceVsWen.text}
+                </span>
+              )}
+              {isPreview ? (
+                <span className="text-blue-600"> · 预览</span>
+              ) : (
+                <span className="text-slate-400"> · 已同步</span>
+              )}
             </p>
-            {wenCatchUpLine && (
-              <p className="mt-1 text-[10px] leading-5 text-violet-600">{wenCatchUpLine}</p>
-            )}
           </div>
 
           {error && (
@@ -201,9 +242,6 @@ export default function StudyPlanSheet({
 
           {!loading && (
             <div className="space-y-2">
-              <p className="mb-2 text-[10px] leading-5 text-slate-400">
-                按每日时长动态排课 · 过去显示已学（划线 ✓）· 超额完成次日自动重算
-              </p>
               {weekDaily.map((row) => (
                 <div
                   key={row.date}
