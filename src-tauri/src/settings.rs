@@ -20,6 +20,8 @@ pub struct Settings {
     pub plan_variant: Option<String>,
     #[serde(default)]
     pub floating_subtitles: Option<bool>,
+    #[serde(default)]
+    pub launch_at_login: Option<bool>,
 }
 
 impl Default for Settings {
@@ -33,6 +35,7 @@ impl Default for Settings {
             woven_style: Some(false),
             plan_variant: Some("v2".into()),
             floating_subtitles: Some(true),
+            launch_at_login: Some(false),
         }
     }
 }
@@ -48,6 +51,10 @@ impl Settings {
 
     pub fn floating_subtitles(&self) -> bool {
         self.floating_subtitles.unwrap_or(true)
+    }
+
+    pub fn launch_at_login(&self) -> bool {
+        self.launch_at_login.unwrap_or(false)
     }
 
     pub fn plan_variant(&self) -> &str {

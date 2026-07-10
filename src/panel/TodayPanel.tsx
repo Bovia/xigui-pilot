@@ -20,6 +20,7 @@ import {
   quitApp,
   setPanelPinned,
   setFloatingSubtitles,
+  setLaunchAtLogin,
   setWovenStyle,
   syncPaceTodayLock,
   toggleQuizDone,
@@ -179,6 +180,19 @@ function catalogSections(catalog: CatalogLesson[]) {
 }
 
 const SECTION_EXPAND_KEY = "xigui-catalog-sections";
+const PANEL_SCROLL_KEY = "xigui-panel-scroll-y";
+
+function scrollLessonToTop(container: HTMLElement, el: Element) {
+  const sectionHeader = el.parentElement?.previousElementSibling;
+  const headerH =
+    sectionHeader instanceof HTMLElement ? sectionHeader.offsetHeight : 36;
+  const buffer = headerH + 10;
+  const top =
+    el.getBoundingClientRect().top -
+    container.getBoundingClientRect().top +
+    container.scrollTop;
+  container.scrollTop = Math.max(0, top - buffer);
+}
 
 function loadExpandedSections(): Record<string, boolean> {
   const defaults = { basic: true, special: true, live: true };
@@ -499,6 +513,7 @@ export default function TodayPanel() {
   const [pinned, setPinned] = useState(true);
   const [wovenStyle, setWovenStyleOn] = useState(false);
   const [floatingSubtitles, setFloatingSubtitlesOn] = useState(true);
+  const [launchAtLogin, setLaunchAtLoginOn] = useState(false);
   const [guideOpen, setGuideOpen] = useState(false);
   const [planOpen, setPlanOpen] = useState(false);
   const [expandedSections, setExpandedSections] = useState(loadExpandedSections);
@@ -515,6 +530,7 @@ export default function TodayPanel() {
   const [wenMarquee, setWenMarquee] = useState("—");
   const menuRef = useRef<HTMLDivElement>(null);
   const panelScrollRef = useRef<HTMLDivElement>(null);
+  const initialScrollDoneRef = useRef(false);
 
   const toggleSection = useCallback((id: string) => {
     setExpandedSections((prev) => {
@@ -524,8 +540,12 @@ export default function TodayPanel() {
     });
   }, []);
 
-  const refresh = useCallback(async () => {
-    setLoading(true);
+  const refresh = useCallback(async (options?: { silent?: boolean }) => {
+    const silent = options?.silent ?? false;
+    const container = panelScrollRef.current;
+    const savedScrollY = silent && container ? container.scrollTop : null;
+
+    if (!silent) setLoading(true);
     setError(null);
     try {
       const data = await getTodaySnapshot();
@@ -558,7 +578,15 @@ export default function TodayPanel() {
     } catch (e) {
       setError(String(e));
     } finally {
-      setLoading(false);
+      if (!silent) {
+        setLoading(false);
+      } else if (savedScrollY != null && panelScrollRef.current) {
+        requestAnimationFrame(() => {
+          if (panelScrollRef.current) {
+            panelScrollRef.current.scrollTop = savedScrollY;
+          }
+        });
+      }
     }
   }, []);
 
@@ -619,6 +647,7 @@ export default function TodayPanel() {
       .then((s) => {
         setWovenStyleOn(s.wovenStyle ?? false);
         setFloatingSubtitlesOn(s.floatingSubtitles ?? true);
+        setLaunchAtLoginOn(s.launchAtLogin ?? false);
       })
       .catch(() => undefined);
   }, [refresh]);
@@ -657,12 +686,12 @@ export default function TodayPanel() {
 
   useEffect(() => {
     const onFocus = () => {
-      refresh();
+      refresh({ silent: true });
     };
     window.addEventListener("focus", onFocus);
     const win = getCurrentWindow();
     const unlistenPromise = win.onFocusChanged(({ payload: focused }) => {
-      if (focused) refresh();
+      if (focused) refresh({ silent: true });
     });
     return () => {
       window.removeEventListener("focus", onFocus);
@@ -673,15 +702,53 @@ export default function TodayPanel() {
   const todayLessonNosKey = [...lessonTags.executionLessonNos].sort((a, b) => a - b).join(",");
 
   useEffect(() => {
-    if (loading || !snapshot?.date || catalog.length === 0 || !todayLessonNosKey) return;
+    const container = panelScrollRef.current;
+    if (!container) return;
 
-    const scrollKey = `xigui-today-scroll-${snapshot.date}`;
-    if (localStorage.getItem(scrollKey) === "1") return;
+    let timer: number | undefined;
+    const onScroll = () => {
+      window.clearTimeout(timer);
+      timer = window.setTimeout(() => {
+        localStorage.setItem(PANEL_SCROLL_KEY, String(container.scrollTop));
+      }, 200);
+    };
+
+    container.addEventListener("scroll", onScroll, { passive: true });
+    return () => {
+      container.removeEventListener("scroll", onScroll);
+      window.clearTimeout(timer);
+    };
+  }, [loading]);
+
+  useEffect(() => {
+    if (loading || initialScrollDoneRef.current || !snapshot?.date || catalog.length === 0) {
+      return;
+    }
+
+    const container = panelScrollRef.current;
+    if (!container) return;
+
+    const hasToday = lessonTags.executionLessonNos.size > 0;
+
+    if (!hasToday) {
+      initialScrollDoneRef.current = true;
+      const saved = localStorage.getItem(PANEL_SCROLL_KEY);
+      if (saved) {
+        const y = Number(saved);
+        if (!Number.isNaN(y)) {
+          container.scrollTop = y;
+        }
+      }
+      return;
+    }
 
     const firstTodayNo = catalog.find((l) =>
       lessonTags.executionLessonNos.has(l.no),
     )?.no;
-    if (firstTodayNo == null) return;
+    if (firstTodayNo == null) {
+      initialScrollDoneRef.current = true;
+      return;
+    }
 
     const section = catalogSections(catalog).find((s) =>
       s.lessons.some((l) => l.no === firstTodayNo),
@@ -691,12 +758,10 @@ export default function TodayPanel() {
     }
 
     const timer = window.setTimeout(() => {
-      const el = panelScrollRef.current?.querySelector(
-        `[data-lesson-no="${firstTodayNo}"]`,
-      );
-      el?.scrollIntoView({ block: "center", behavior: "smooth" });
-      localStorage.setItem(scrollKey, "1");
-    }, 150);
+      const el = container.querySelector(`[data-lesson-no="${firstTodayNo}"]`);
+      if (el) scrollLessonToTop(container, el);
+      initialScrollDoneRef.current = true;
+    }, 200);
 
     return () => window.clearTimeout(timer);
   }, [loading, snapshot?.date, catalog, todayLessonNosKey, lessonTags.executionLessonNos]);
@@ -818,6 +883,16 @@ export default function TodayPanel() {
     try {
       await setPanelPinned(next);
       setPinned(next);
+    } catch (e) {
+      setError(String(e));
+    }
+  };
+
+  const toggleLaunchAtLogin = async () => {
+    const next = !launchAtLogin;
+    try {
+      await setLaunchAtLogin(next);
+      setLaunchAtLoginOn(next);
     } catch (e) {
       setError(String(e));
     }
@@ -981,6 +1056,13 @@ export default function TodayPanel() {
                   className="w-full px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50"
                 >
                   {wovenStyle ? "✓ 织物质感" : "织物质感"}
+                </button>
+                <button
+                  type="button"
+                  onClick={toggleLaunchAtLogin}
+                  className="w-full px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50"
+                >
+                  {launchAtLogin ? "✓ 开机自启动" : "开机自启动"}
                 </button>
                 <button
                   type="button"

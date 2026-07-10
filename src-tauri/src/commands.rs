@@ -984,6 +984,25 @@ pub fn set_floating_subtitles(app: AppHandle, enabled: bool) -> Result<Settings,
     Ok(settings)
 }
 
+pub(crate) fn apply_launch_at_login(app: &AppHandle, enabled: bool) -> Result<(), String> {
+    use tauri_plugin_autostart::ManagerExt;
+    let autolaunch = app.autolaunch();
+    if enabled {
+        autolaunch.enable().map_err(|e| e.to_string())
+    } else {
+        autolaunch.disable().map_err(|e| e.to_string())
+    }
+}
+
+#[tauri::command]
+pub fn set_launch_at_login(app: AppHandle, enabled: bool) -> Result<Settings, String> {
+    apply_launch_at_login(&app, enabled)?;
+    let (path, mut settings) = settings_for(&app)?;
+    settings.launch_at_login = Some(enabled);
+    settings.save(&path)?;
+    Ok(settings)
+}
+
 fn open_subtitles_for_active_players(app: &AppHandle) {
     if let Some(lesson_no) = crate::active_player_lesson(app) {
         let _ = open_subtitle_window(app.clone(), lesson_no);

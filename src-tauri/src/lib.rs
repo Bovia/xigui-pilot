@@ -11,7 +11,7 @@ use tauri::{
     ActivationPolicy, AppHandle, Emitter, Manager, RunEvent, TitleBarStyle, WebviewUrl,
     WebviewWindowBuilder,
 };
-use tauri_plugin_positioner::{on_tray_event, Position, WindowExt};
+use tauri_plugin_positioner::{on_tray_event, WindowExt};
 
 pub struct AppState {
     pub suppress_panel_hide: Mutex<bool>,
@@ -28,6 +28,7 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_positioner::init())
+        .plugin(tauri_plugin_autostart::Builder::new().build())
         .setup(|app| {
             #[cfg(target_os = "macos")]
             app.set_activation_policy(ActivationPolicy::Accessory);
@@ -59,6 +60,7 @@ pub fn run() {
 
             if let Ok((_, settings)) = commands::settings_for(app.handle()) {
                 let _ = apply_panel_pinned(app.handle(), settings.panel_pinned());
+                let _ = commands::apply_launch_at_login(app.handle(), settings.launch_at_login());
             }
 
             Ok(())
@@ -90,6 +92,7 @@ pub fn run() {
             commands::set_woven_style,
             commands::set_plan_variant,
             commands::set_floating_subtitles,
+            commands::set_launch_at_login,
             commands::resolve_subtitle_path,
             commands::open_subtitle_window,
             commands::close_subtitle_window_cmd,
@@ -101,6 +104,7 @@ pub fn run() {
         .expect("error while running tauri application")
         .run(|app, event| {
             match event {
+                RunEvent::Ready => show_panel(&app),
                 RunEvent::Reopen { .. } => toggle_panel(&app),
                 RunEvent::WindowEvent { label, event, .. } if label == "panel" => {
                     if let tauri::WindowEvent::Focused(false) = event {
@@ -255,6 +259,14 @@ pub fn refresh_tray_badge(app: &AppHandle) {
     let _ = tray.set_tooltip(Some(tooltip));
 }
 
+fn show_panel(app: &AppHandle) {
+    activate_for_action(app);
+    if let Some(window) = app.get_webview_window("panel") {
+        let _ = window.show();
+        let _ = window.set_focus();
+    }
+}
+
 fn toggle_panel(app: &AppHandle) {
     let Some(window) = app.get_webview_window("panel") else {
         return;
@@ -266,10 +278,7 @@ fn toggle_panel(app: &AppHandle) {
         return;
     }
 
-    activate_for_action(app);
-    let _ = window.move_window(Position::TrayCenter);
-    let _ = window.show();
-    let _ = window.set_focus();
+    show_panel(app);
 }
 
 pub fn ensure_player_window(app: &AppHandle, lesson_no: u32) -> Result<(), String> {

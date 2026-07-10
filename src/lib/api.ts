@@ -229,6 +229,9 @@ export const closeSubtitleWindow = (lessonNo: number) =>
 export const setFloatingSubtitles = (enabled: boolean) =>
   invoke<Settings>("set_floating_subtitles", { enabled });
 
+export const setLaunchAtLogin = (enabled: boolean) =>
+  invoke<Settings>("set_launch_at_login", { enabled });
+
 export const openPlanSpreadsheet = (variant: PlanVariant) =>
   invoke<void>("open_plan_spreadsheet", { variant });
 
