@@ -93,7 +93,7 @@ export default function HelpGuide({ open, quizName, onClose }: Props) {
               <code className="text-[11px]">.vtt</code> 文件。例如视频为{" "}
               <code className="text-[11px]">[01]--导学.mp4</code>，字幕应为{" "}
               <code className="text-[11px]">[01]--导学.srt</code>。字幕条可拖到桌面任意位置。
-              设置里可切换<strong>猫猫模式</strong>：像素奶牛猫常驻。暂停/无播放时休息；播放中安静陪伴；只有开启悬浮字幕且当前有字幕句时才冒气泡。靠屏幕右侧时气泡会自动翻到左边。
+              设置里可切换<strong>猫猫模式</strong>：像素奶牛猫常驻（开机自启后面板起来就会出现）。暂停/关视频时休息、不说话；播放中安静陪伴；只有开启悬浮字幕且当前有字幕句时才冒气泡。靠屏幕右侧时气泡会自动翻到左边。
             </p>
           </section>
 

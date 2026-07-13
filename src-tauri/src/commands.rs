@@ -1,7 +1,8 @@
 use crate::progress::{progress_path, PaceTodayLock, ProgressStore, VideoProgress};
 use crate::settings::{settings_path, Settings};
 use crate::{
-    activate_for_action, close_subtitle_window, ensure_player_window, ensure_subtitle_window,
+    activate_for_action, close_subtitle_window, ensure_cat_companion, ensure_player_window,
+    ensure_subtitle_window,
     refresh_subtitle_windows_for_mode, restore_accessory, set_panel_hide_suppressed,
 };
 use chrono::{Local, NaiveDate};
@@ -1033,7 +1034,7 @@ pub fn set_subtitle_cat_mode(app: AppHandle, enabled: bool) -> Result<Settings, 
     settings.save(&path)?;
 
     if enabled {
-        open_subtitles_for_active_players(&app);
+        ensure_cat_companion(&app);
         refresh_subtitle_windows_for_mode(&app, true);
     } else if !settings.floating_subtitles() {
         let windows: Vec<String> = app
@@ -1074,9 +1075,7 @@ pub fn set_launch_at_login(app: AppHandle, enabled: bool) -> Result<Settings, St
 }
 
 fn open_subtitles_for_active_players(app: &AppHandle) {
-    if let Some(lesson_no) = crate::active_player_lesson(app) {
-        let _ = open_subtitle_window(app.clone(), lesson_no);
-    }
+    ensure_cat_companion(app);
 }
 
 #[tauri::command]

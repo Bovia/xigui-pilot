@@ -125,17 +125,30 @@ export function nextCue(cues: SubtitleCue[], time: number): SubtitleCue | null {
   return null;
 }
 
+/**
+ * 播放器生命周期（猫猫窗用）
+ * - none：无播放器（开机陪伴 / 已关视频）
+ * - paused：播放器在，但暂停
+ * - playing：正在播
+ */
 export type CatPlayback = "none" | "paused" | "playing";
 
-/** 猫猫模式展示态（仅 catMode=true 时有意义） */
+/**
+ * 猫猫模式展示态（仅 catMode=true）
+ *
+ * | playback | floating | hasCue | view | 画面 |
+ * | none/paused | * | * | idle-rest | 趴姿，无气泡 |
+ * | playing | off | * | playing-quiet | 坐姿，无气泡 |
+ * | playing | on | no | playing-gap | 坐姿，无气泡 |
+ * | playing | on | yes | playing-speak | 坐姿 + 字幕气泡 |
+ *
+ * 关视频 → playback=none，气泡必须消失；猫窗可留下陪伴。
+ * 开机自启 → 面板 Ready 后拉猫窗，初始 idle-rest。
+ */
 export type CatCompanionView =
-  /** 无视频 / 暂停：休息姿势，无气泡 */
   | "idle-rest"
-  /** 播放中 + 字幕关：坐姿安静猫，无气泡 */
   | "playing-quiet"
-  /** 播放中 + 字幕开 + 当前无句：坐姿安静猫，无气泡（非待机） */
   | "playing-gap"
-  /** 播放中 + 字幕开 + 当前有句：坐姿 + 气泡 */
   | "playing-speak";
 
 export function resolveCatCompanionView(input: {

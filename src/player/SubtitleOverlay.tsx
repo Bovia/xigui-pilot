@@ -74,7 +74,7 @@ export default function SubtitleOverlay({ lessonNo }: { lessonNo: number }) {
   const [ready, setReady] = useState(false);
   const [catMode, setCatMode] = useState(true);
   const [floatingSubtitles, setFloatingSubtitles] = useState(true);
-  const [playback, setPlayback] = useState<CatPlayback>("paused");
+  const [playback, setPlayback] = useState<CatPlayback>("none");
   const [bubbleLeft, setBubbleLeft] = useState(false);
   const [tailFrame, setTailFrame] = useState(0);
   const saveTimer = useRef<number | undefined>(undefined);
@@ -341,18 +341,25 @@ export default function SubtitleOverlay({ lessonNo }: { lessonNo: number }) {
       }
     });
 
-    const unlistenPlayback = listen<{ lessonNo: number; playing: boolean }>(
-      "player-playback",
-      (event) => {
-        if (event.payload.lessonNo !== lessonNo) return;
-        setPlayback(event.payload.playing ? "playing" : "paused");
-        if (!event.payload.playing) {
-          stickyTextRef.current = "";
-          setCurrentText("");
-          setNextText("");
-        }
-      },
-    );
+    const clearSpeech = () => {
+      stickyTextRef.current = "";
+      setCurrentText("");
+      setNextText("");
+    };
+
+    const unlistenPlayback = listen<{
+      lessonNo: number;
+      playing: boolean;
+      closed?: boolean;
+    }>("player-playback", (event) => {
+      if (event.payload.lessonNo !== lessonNo) return;
+      if (event.payload.closed || !event.payload.playing) {
+        setPlayback(event.payload.closed ? "none" : "paused");
+        clearSpeech();
+        return;
+      }
+      setPlayback("playing");
+    });
 
     return () => {
       unlistenTime.then((fn) => fn());

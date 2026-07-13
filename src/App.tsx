@@ -10,10 +10,12 @@ function readView() {
   return params.get("view") ?? "panel";
 }
 
-function readLessonNo() {
+function readLessonNo(): number | undefined {
   const params = new URLSearchParams(window.location.search);
   const raw = params.get("lesson");
-  return raw ? Number(raw) : undefined;
+  if (raw === null) return undefined;
+  const n = Number(raw);
+  return Number.isFinite(n) ? n : undefined;
 }
 
 export default function App() {
@@ -46,11 +48,11 @@ export default function App() {
     win.setDecorations(view !== "panel" && view !== "subtitle").catch(() => undefined);
   }, [view]);
 
-  if (view === "subtitle" && lessonNo) {
+  if (view === "subtitle" && lessonNo !== undefined) {
     return <SubtitleOverlay lessonNo={lessonNo} />;
   }
 
-  if (view === "player" && lessonNo) {
+  if (view === "player" && lessonNo !== undefined) {
     return <VideoPlayer lessonNo={lessonNo} />;
   }
 

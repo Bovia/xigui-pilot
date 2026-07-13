@@ -21,6 +21,8 @@ pub struct AppState {
 
 /// 全局唯一播放器窗口（所有课节共用，切集只换片源）
 pub const PLAYER_WINDOW_LABEL: &str = "player";
+/// 无播放器时的猫猫陪伴窗课节号（窗口身份用，可不挂字幕文件）
+pub const CAT_COMPANION_LESSON: u32 = 0;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -131,15 +133,20 @@ pub fn run() {
                         tauri::WindowEvent::CloseRequested { .. }
                             | tauri::WindowEvent::Destroyed
                     ) {
-                        // 猫猫模式：字幕窗留下陪伴；常规模式随播放器关闭
+                        // 猫猫模式：字幕窗留下陪伴并清气泡；常规模式随播放器关闭
                         let keep_cat = settings::settings_path(&app)
                             .map(|path| settings::Settings::load(&path).subtitle_cat_mode())
                             .unwrap_or(true);
-                        if let Ok(guard) = app.state::<AppState>().active_player_lesson.lock() {
-                            if let Some(lesson_no) = *guard {
-                                if !keep_cat {
-                                    close_subtitle_window(&app, lesson_no);
-                                }
+                        let lesson_no = app
+                            .state::<AppState>()
+                            .active_player_lesson
+                            .lock()
+                            .ok()
+                            .and_then(|guard| *guard);
+                        if let Some(lesson_no) = lesson_no {
+                            notify_player_closed(&app, lesson_no);
+                            if !keep_cat {
+                                close_subtitle_window(&app, lesson_no);
                             }
                         }
                         if let Ok(mut guard) = app.state::<AppState>().active_player_lesson.lock() {
@@ -273,6 +280,47 @@ fn show_panel(app: &AppHandle) {
         let _ = window.show();
         let _ = window.set_focus();
     }
+    ensure_cat_companion(app);
+}
+
+/// 通知猫猫窗：播放器已关闭 → 清气泡、idle-rest
+fn notify_player_closed(app: &AppHandle, lesson_no: u32) {
+    let payload = serde_json::json!({
+        "lessonNo": lesson_no,
+        "playing": false,
+        "closed": true,
+    });
+    let _ = app.emit("player-playback", payload);
+}
+
+/// 猫猫模式：保证有一只陪伴猫（有播放器跟当前课；否则用 companion 窗）
+pub fn ensure_cat_companion(app: &AppHandle) {
+    let cat_mode = settings::settings_path(app)
+        .map(|path| settings::Settings::load(&path).subtitle_cat_mode())
+        .unwrap_or(true);
+    if !cat_mode {
+        return;
+    }
+
+    if let Some(lesson_no) = active_player_lesson(app) {
+        let _ = ensure_subtitle_window(app, lesson_no);
+        return;
+    }
+
+    // 关视频后留下的课节猫窗：直接亮起来即可
+    for (label, window) in app.webview_windows() {
+        if let Some(suffix) = label.strip_prefix("subtitle-") {
+            if let Ok(lesson_no) = suffix.parse::<u32>() {
+                if lesson_no != CAT_COMPANION_LESSON {
+                    let _ = window.show();
+                    let _ = window.set_always_on_top(true);
+                    return;
+                }
+            }
+        }
+    }
+
+    let _ = ensure_subtitle_window(app, CAT_COMPANION_LESSON);
 }
 
 fn toggle_panel(app: &AppHandle) {
@@ -379,6 +427,11 @@ pub fn ensure_subtitle_window(app: &AppHandle, lesson_no: u32) -> Result<(), Str
         .map(|path| settings::Settings::load(&path).subtitle_cat_mode())
         .unwrap_or(true);
 
+    // 真正开课字幕时收掉开机 companion，避免两只猫
+    if lesson_no != CAT_COMPANION_LESSON {
+        close_subtitle_window(app, CAT_COMPANION_LESSON);
+    }
+
     if let Some(window) = app.get_webview_window(&label) {
         let _ = window.show();
         let _ = window.set_always_on_top(true);
@@ -390,7 +443,7 @@ pub fn ensure_subtitle_window(app: &AppHandle, lesson_no: u32) -> Result<(), Str
 
     let (w, h) = subtitle_window_size(cat_mode);
     let url = WebviewUrl::App(format!("index.html?view=subtitle&lesson={lesson_no}").into());
-    WebviewWindowBuilder::new(app, &label, url)
+    let window = WebviewWindowBuilder::new(app, &label, url)
         .title("字幕")
         .inner_size(w, h)
         .min_inner_size(
@@ -405,6 +458,8 @@ pub fn ensure_subtitle_window(app: &AppHandle, lesson_no: u32) -> Result<(), Str
         .skip_taskbar(true)
         .build()
         .map_err(|e| e.to_string())?;
+    let _ = window.show();
+    let _ = window.set_always_on_top(true);
 
     Ok(())
 }

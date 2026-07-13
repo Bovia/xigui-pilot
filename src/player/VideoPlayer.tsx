@@ -221,7 +221,7 @@ export default function VideoPlayer({ lessonNo }: { lessonNo: number }) {
     lessonNoRef.current = lessonNo;
   }, [lessonNo]);
 
-  /** 关窗不落盘：同步掐声拆源 → 藏窗 → 销窗（不要先 await hide，否则声音会拖尾） */
+  /** 关窗不落盘：同步掐声拆源 → 通知猫 idle → 藏窗 → 销窗（不要先 await hide，否则声音会拖尾） */
   const closePlayerWindow = useCallback(async () => {
     if (closingRef.current) return;
     closingRef.current = true;
@@ -233,7 +233,10 @@ export default function VideoPlayer({ lessonNo }: { lessonNo: number }) {
       // 必须同步完成：先停声拆源，再藏窗（藏窗后 teardown 黑帧用户看不见）
       silencePlayer(artRef);
       teardownPlayer(artRef);
-      emit("player-playback", { lessonNo: no, playing: false }).catch(() => undefined);
+      // closed:true → 猫窗清气泡并进入 idle-rest（窗本身由猫模式保留）
+      emit("player-playback", { lessonNo: no, playing: false, closed: true }).catch(
+        () => undefined,
+      );
       win.hide().catch(() => undefined);
       // 猫猫模式由 Rust 保留字幕窗；常规模式关窗时一并关掉
       getSettings()
@@ -256,12 +259,17 @@ export default function VideoPlayer({ lessonNo }: { lessonNo: number }) {
     }
   }, []);
 
-  // 原生红灯：不拦截；销毁前同步掐声
+  // 原生红灯：不拦截；销毁前同步掐声并通知猫 idle
   useEffect(() => {
     const onPageHide = () => {
       pushTimeUpdateRef.current = null;
       silencePlayer(artRef);
       teardownPlayer(artRef);
+      emit("player-playback", {
+        lessonNo: lessonNoRef.current,
+        playing: false,
+        closed: true,
+      }).catch(() => undefined);
     };
 
     window.addEventListener("pagehide", onPageHide);
@@ -602,7 +610,10 @@ export default function VideoPlayer({ lessonNo }: { lessonNo: number }) {
         }
       }
       windowAspect?.dispose();
-      closeSubtitleWindow(lessonNo).catch(() => undefined);
+      // 切课：关掉旧课字幕窗（新课 boot 会再开）。关播放器时猫模式要保留窗，勿在此抢关。
+      if (!closingRef.current) {
+        closeSubtitleWindow(lessonNo).catch(() => undefined);
+      }
       pushTimeUpdateRef.current = null;
       teardownPlayer(artRef);
     };
