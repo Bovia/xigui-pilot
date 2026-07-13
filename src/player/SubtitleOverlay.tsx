@@ -8,7 +8,7 @@ import {
 } from "@tauri-apps/api/window";
 import { WebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { getSettings, resolveSubtitlePath } from "../lib/api";
+import { getSettings, openPlayer, resolveSubtitlePath, showPanelWindow } from "../lib/api";
 import {
   cueAtTime,
   loadSubtitlePosition,
@@ -92,9 +92,19 @@ export default function SubtitleOverlay({ lessonNo }: { lessonNo: number }) {
 
   const focusPlayerWindow = useCallback(async () => {
     const player = await WebviewWindow.getByLabel("player").catch(() => null);
-    if (!player) return;
-    await player.show().catch(() => undefined);
-    await player.setFocus().catch(() => undefined);
+    if (player) {
+      const visible = await player.isVisible().catch(() => false);
+      if (visible) {
+        await player.show().catch(() => undefined);
+        await player.setFocus().catch(() => undefined);
+        return;
+      }
+    }
+    await openPlayer(lessonNo).catch(() => undefined);
+  }, [lessonNo]);
+
+  const focusPanelWindow = useCallback(async () => {
+    await showPanelWindow().catch(() => undefined);
   }, []);
 
   const updateBubbleSide = useCallback(async () => {
@@ -306,7 +316,6 @@ export default function SubtitleOverlay({ lessonNo }: { lessonNo: number }) {
       const paused = event.payload.playing === false;
 
       if (cue?.text) {
-        // 连续播放：句间不摘气泡，只换文案
         stickyTextRef.current = cue.text;
         setCurrentText(cue.text);
         setNextText(upcoming && upcoming !== cue ? upcoming.text : "");
@@ -458,13 +467,41 @@ export default function SubtitleOverlay({ lessonNo }: { lessonNo: number }) {
       });
   }
 
-  function onBarMouseUp(e: React.MouseEvent) {
-    if (e.button !== 0) return;
-    const didDrag = dragState.current.didDrag;
-    draggingRef.current = false;
-    if (didDrag) return;
-    focusPlayerWindow().catch(() => undefined);
+  function makeDragHandlers(onClick: () => void, title: string) {
+    return {
+      title,
+      onMouseDown: onBarMouseDown,
+      onMouseMove: onBarMouseMove,
+      onMouseUp: (e: React.MouseEvent) => {
+        if (e.button !== 0) return;
+        const didDrag = dragState.current.didDrag;
+        draggingRef.current = false;
+        if (didDrag) return;
+        onClick();
+      },
+    };
   }
+
+  const bubbleDragHandlers = makeDragHandlers(
+    () => {
+      focusPlayerWindow().catch(() => undefined);
+    },
+    "点击打开视频 · 拖动移动",
+  );
+
+  const catDragHandlers = makeDragHandlers(
+    () => {
+      focusPanelWindow().catch(() => undefined);
+    },
+    "点击打开面板 · 拖动移动",
+  );
+
+  const barDragHandlers = makeDragHandlers(
+    () => {
+      focusPlayerWindow().catch(() => undefined);
+    },
+    "点击打开视频 · 拖动移动",
+  );
 
   useEffect(() => {
     function endDrag() {
@@ -474,13 +511,6 @@ export default function SubtitleOverlay({ lessonNo }: { lessonNo: number }) {
     window.addEventListener("mouseup", endDrag);
     return () => window.removeEventListener("mouseup", endDrag);
   }, [clampWindowToMonitor]);
-
-  const dragHandlers = {
-    title: "点击前置视频 · 拖动移动",
-    onMouseDown: onBarMouseDown,
-    onMouseMove: onBarMouseMove,
-    onMouseUp: onBarMouseUp,
-  };
 
   function setHitRef(index: number) {
     return (el: HTMLElement | null) => {
@@ -569,7 +599,7 @@ export default function SubtitleOverlay({ lessonNo }: { lessonNo: number }) {
             <div
               ref={setHitRef(0)}
               className="subtitle-bubble subtitle-bubble--visible cursor-grab select-none active:cursor-grabbing"
-              {...dragHandlers}
+              {...bubbleDragHandlers}
             >
               <p className="subtitle-current">{currentText}</p>
               {nextText && <p className="subtitle-next">{nextText}</p>}
@@ -587,9 +617,9 @@ export default function SubtitleOverlay({ lessonNo }: { lessonNo: number }) {
             }
             alt=""
             draggable={false}
-            width={restPose ? 96 : 70}
-            height={restPose ? 75 : 80}
-            {...dragHandlers}
+            width={restPose ? 144 : 120}
+            height={restPose ? 112 : 136}
+            {...catDragHandlers}
           />
         </div>
       </div>
@@ -598,7 +628,10 @@ export default function SubtitleOverlay({ lessonNo }: { lessonNo: number }) {
 
   return (
     <div className="subtitle-overlay-shell flex h-full w-full items-end justify-center p-2">
-      <div className="subtitle-bar w-full max-w-2xl cursor-grab select-none active:cursor-grabbing" {...dragHandlers}>
+      <div
+        className="subtitle-bar w-full max-w-2xl cursor-grab select-none active:cursor-grabbing"
+        {...barDragHandlers}
+      >
         {currentText ? (
           <p className="subtitle-current">{currentText}</p>
         ) : (

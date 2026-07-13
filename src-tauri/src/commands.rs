@@ -578,6 +578,17 @@ pub fn prepare_dialog(app: AppHandle) {
 }
 
 #[tauri::command]
+pub fn show_panel_window(app: AppHandle) -> Result<(), String> {
+    activate_for_action(&app);
+    if let Some(window) = app.get_webview_window("panel") {
+        let _ = window.unminimize();
+        let _ = window.show();
+        let _ = window.set_focus();
+    }
+    Ok(())
+}
+
+#[tauri::command]
 pub fn finish_dialog(app: AppHandle) {
     set_panel_hide_suppressed(&app, false);
     if let Some(window) = app.get_webview_window("panel") {

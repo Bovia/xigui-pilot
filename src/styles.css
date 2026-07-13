@@ -385,8 +385,8 @@ button {
 
 .subtitle-cat-pet {
   pointer-events: auto;
-  width: 64px;
-  height: 64px;
+  width: 120px;
+  height: 120px;
   object-fit: contain;
   image-rendering: pixelated;
   image-rendering: crisp-edges;
@@ -397,15 +397,15 @@ button {
 }
 
 .subtitle-cat-pet--talk {
-  width: 70px;
-  height: 80px;
+  width: 120px;
+  height: 136px;
   /* 尾巴摆动靠切帧完成，身体只保留极弱呼吸，避免和尾巴抢戏 */
   animation: subtitle-cat-breathe-soft 3.6s ease-in-out infinite;
 }
 
 .subtitle-cat-pet--rest {
-  width: 96px;
-  height: 75px;
+  width: 144px;
+  height: 112px;
   animation: subtitle-cat-breathe 4.4s ease-in-out infinite;
 }
 

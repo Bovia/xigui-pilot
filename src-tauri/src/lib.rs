@@ -99,6 +99,7 @@ pub fn run() {
             commands::close_subtitle_window_cmd,
             commands::sync_pace_today_lock,
             commands::set_player_chrome_visible,
+            commands::show_panel_window,
             commands::quit_app,
         ])
         .build(tauri::generate_context!())
@@ -130,9 +131,15 @@ pub fn run() {
                         tauri::WindowEvent::CloseRequested { .. }
                             | tauri::WindowEvent::Destroyed
                     ) {
+                        // 猫猫模式：字幕窗留下陪伴；常规模式随播放器关闭
+                        let keep_cat = settings::settings_path(&app)
+                            .map(|path| settings::Settings::load(&path).subtitle_cat_mode())
+                            .unwrap_or(true);
                         if let Ok(guard) = app.state::<AppState>().active_player_lesson.lock() {
                             if let Some(lesson_no) = *guard {
-                                close_subtitle_window(&app, lesson_no);
+                                if !keep_cat {
+                                    close_subtitle_window(&app, lesson_no);
+                                }
                             }
                         }
                         if let Ok(mut guard) = app.state::<AppState>().active_player_lesson.lock() {
@@ -288,12 +295,17 @@ pub fn ensure_player_window(app: &AppHandle, lesson_no: u32) -> Result<(), Strin
     set_active_player_lesson(app, lesson_no);
 
     if let Some(window) = app.get_webview_window(PLAYER_WINDOW_LABEL) {
-        let title = format!("第{lesson_no}节");
-        let _ = window.set_title(&title);
-        let _ = window.show();
-        let _ = window.set_focus();
-        let _ = window.emit("player-open", lesson_no);
-        return Ok(());
+        // 关窗流程会先 hide：半死窗口禁止复用，直接销毁后重建
+        let visible = window.is_visible().unwrap_or(false);
+        if visible {
+            let title = format!("第{lesson_no}节");
+            let _ = window.set_title(&title);
+            let _ = window.show();
+            let _ = window.set_focus();
+            let _ = window.emit("player-open", lesson_no);
+            return Ok(());
+        }
+        let _ = window.destroy();
     }
 
     let pinned = commands::settings_for(app)
@@ -333,7 +345,7 @@ pub fn close_subtitle_window(app: &AppHandle, lesson_no: u32) {
 
 pub fn subtitle_window_size(cat_mode: bool) -> (f64, f64) {
     if cat_mode {
-        (560.0, 220.0)
+        (560.0, 280.0)
     } else {
         (640.0, 88.0)
     }
@@ -344,7 +356,7 @@ pub fn apply_subtitle_window_layout(window: &WebviewWindow, cat_mode: bool) {
     let _ = window.set_size(LogicalSize::new(w, h));
     let _ = window.set_min_size(Some(LogicalSize::new(
         if cat_mode { 320.0 } else { 320.0 },
-        if cat_mode { 150.0 } else { 64.0 },
+        if cat_mode { 200.0 } else { 64.0 },
     )));
 }
 

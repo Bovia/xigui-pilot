@@ -127,6 +127,8 @@ export const setPlayerPinned = (pinned: boolean, lessonNo?: number) =>
 export const setPlayerChromeVisible = (visible: boolean) =>
   invoke<void>("set_player_chrome_visible", { visible });
 
+export const showPanelWindow = () => invoke<void>("show_panel_window");
+
 export const syncPaceTodayLock = (
   date: string,
   dailyHours: number,
@@ -162,9 +164,9 @@ export const openPlayer = (lessonNo: number) =>
 export const resolveVideoPath = (lessonNo: number) =>
   invoke<string>("resolve_video_path", { lessonNo });
 
-/** 进度落盘：合并为「最新一条」并串行写入，避免并发 RMW 用旧 position 覆盖新进度 */
-type PendingProgress = { lessonNo: number; position: number; duration: number };
-let pendingProgress: PendingProgress | null = null;
+/** 进度落盘：按课号合并「最新一条」并串行写入，避免串课覆盖 */
+type PendingProgress = { position: number; duration: number };
+const pendingByLesson = new Map<number, PendingProgress>();
 let progressSaveChain: Promise<void> = Promise.resolve();
 
 export function saveVideoProgress(
@@ -172,29 +174,23 @@ export function saveVideoProgress(
   position: number,
   duration: number,
 ): Promise<void> {
-  pendingProgress = { lessonNo, position, duration };
+  pendingByLesson.set(lessonNo, { position, duration });
   progressSaveChain = progressSaveChain
     .catch(() => undefined)
     .then(async () => {
-      while (pendingProgress) {
-        const next = pendingProgress;
-        pendingProgress = null;
-        await invoke("save_video_progress", next).catch(() => undefined);
+      while (pendingByLesson.size > 0) {
+        const batch = new Map(pendingByLesson);
+        pendingByLesson.clear();
+        for (const [no, next] of batch) {
+          await invoke("save_video_progress", {
+            lessonNo: no,
+            position: next.position,
+            duration: next.duration,
+          }).catch(() => undefined);
+        }
       }
     });
   return progressSaveChain;
-}
-
-/** 关窗/pagehide 最终落盘：直接写最新位置，不堵在长队列上 */
-export async function saveVideoProgressFinal(
-  lessonNo: number,
-  position: number,
-  duration: number,
-): Promise<void> {
-  pendingProgress = { lessonNo, position, duration };
-  await invoke("save_video_progress", { lessonNo, position, duration }).catch(
-    () => undefined,
-  );
 }
 
 export const openExternalVideo = (lessonNo: number) =>

@@ -15,7 +15,6 @@ import {
   resolveSubtitlePath,
   resolveVideoPath,
   saveVideoProgress,
-  saveVideoProgressFinal,
   setPlayerChromeVisible,
   setPlayerPinned,
 } from "../lib/api";
@@ -39,6 +38,32 @@ function hidePlayerControls(art: Artplayer) {
   }
 }
 
+function silencePlayer(artRef: React.MutableRefObject<Artplayer | null>) {
+  const art = artRef.current;
+  if (!art) return;
+  try {
+    art.muted = true;
+    art.volume = 0;
+    art.pause();
+    const video = art.template?.$video as HTMLVideoElement | undefined;
+    if (video) {
+      video.muted = true;
+      video.volume = 0;
+      video.pause();
+      // 立刻掐断解码/缓冲，避免 pause 后音频还拖尾
+      try {
+        video.srcObject = null;
+      } catch {
+        /* ignore */
+      }
+      video.removeAttribute("src");
+      video.load();
+    }
+  } catch {
+    /* ignore */
+  }
+}
+
 function teardownPlayer(artRef: React.MutableRefObject<Artplayer | null>) {
   const art = artRef.current;
   if (!art) return;
@@ -46,13 +71,7 @@ function teardownPlayer(artRef: React.MutableRefObject<Artplayer | null>) {
     if (art.pip) {
       art.pip = false;
     }
-    art.pause();
-    const video = art.template?.$video;
-    if (video) {
-      video.pause();
-      video.removeAttribute("src");
-      video.load();
-    }
+    silencePlayer(artRef);
     art.destroy();
   } catch {
     // 窗口关闭过程中 DOM 可能已卸载
@@ -62,8 +81,6 @@ function teardownPlayer(artRef: React.MutableRefObject<Artplayer | null>) {
 
 /** 播放中节流落盘间隔 */
 const PROGRESS_SAVE_MS = 1000;
-/** 自定义关窗时最多等落盘多久（超时也必须关） */
-const CLOSE_SAVE_BUDGET_MS = 400;
 /** 面板进度条 UI 刷新间隔（事件广播，不写盘） */
 const PROGRESS_UI_EMIT_MS = 300;
 
@@ -71,25 +88,6 @@ function broadcastProgressUi(lessonNo: number, position: number, duration: numbe
   const payload = { lessonNo, position, duration };
   emit("video-progress-updated", payload).catch(() => undefined);
   emitTo("panel", "video-progress-updated", payload).catch(() => undefined);
-}
-
-/** 落盘最新播放头；art 已拆时用 lastKnown */
-function flushVideoProgress(
-  artRef: React.MutableRefObject<Artplayer | null>,
-  lessonNo: number,
-  lastKnown: React.MutableRefObject<{ position: number; duration: number }>,
-): Promise<void> {
-  const art = artRef.current;
-  let position = lastKnown.current.position;
-  let duration = lastKnown.current.duration;
-  if (art) {
-    position = readVideoTime(art);
-    duration = art.duration || duration;
-    lastKnown.current = { position, duration };
-  }
-  if (position <= 0 && duration <= 0) return Promise.resolve();
-  broadcastProgressUi(lessonNo, position, duration);
-  return saveVideoProgressFinal(lessonNo, position, duration);
 }
 
 function readVideoTime(art: Artplayer): number {
@@ -223,43 +221,47 @@ export default function VideoPlayer({ lessonNo }: { lessonNo: number }) {
     lessonNoRef.current = lessonNo;
   }, [lessonNo]);
 
-  /** 自定义关闭热区：限时落盘 → 关字幕 → 销窗。不 teardown，避免黑框残留。 */
+  /** 关窗不落盘：同步掐声拆源 → 藏窗 → 销窗（不要先 await hide，否则声音会拖尾） */
   const closePlayerWindow = useCallback(async () => {
     if (closingRef.current) return;
     closingRef.current = true;
     window.clearTimeout(chromeHideTimerRef.current);
+    const win = getCurrentWindow();
+    const no = lessonNoRef.current;
     try {
-      try {
-        artRef.current?.pause();
-      } catch {
-        /* ignore */
-      }
-      await Promise.race([
-        flushVideoProgress(artRef, lessonNo, lastKnownRef).catch(() => undefined),
-        new Promise<void>((resolve) =>
-          window.setTimeout(resolve, CLOSE_SAVE_BUDGET_MS),
-        ),
-      ]);
       pushTimeUpdateRef.current = null;
-      await closeSubtitleWindow(lessonNo).catch(() => undefined);
+      // 必须同步完成：先停声拆源，再藏窗（藏窗后 teardown 黑帧用户看不见）
+      silencePlayer(artRef);
+      teardownPlayer(artRef);
+      emit("player-playback", { lessonNo: no, playing: false }).catch(() => undefined);
+      win.hide().catch(() => undefined);
+      // 猫猫模式由 Rust 保留字幕窗；常规模式关窗时一并关掉
+      getSettings()
+        .then((s) => {
+          if (!(s.subtitleCatMode ?? true)) {
+            closeSubtitleWindow(no).catch(() => undefined);
+          }
+        })
+        .catch(() => {
+          closeSubtitleWindow(no).catch(() => undefined);
+        });
       try {
-        await getCurrentWindow().destroy();
+        await win.destroy();
       } catch {
-        await getCurrentWindow().close().catch(() => undefined);
+        await win.close().catch(() => undefined);
         closingRef.current = false;
       }
     } catch {
       closingRef.current = false;
     }
-  }, [lessonNo]);
+  }, []);
 
-  // 不拦截系统红灯：原生关闭必须立刻生效；进度靠播放中节流 + pagehide 尽力写
+  // 原生红灯：不拦截；销毁前同步掐声
   useEffect(() => {
     const onPageHide = () => {
-      flushVideoProgress(artRef, lessonNoRef.current, lastKnownRef).catch(
-        () => undefined,
-      );
       pushTimeUpdateRef.current = null;
+      silencePlayer(artRef);
+      teardownPlayer(artRef);
     };
 
     window.addEventListener("pagehide", onPageHide);
@@ -334,19 +336,20 @@ export default function VideoPlayer({ lessonNo }: { lessonNo: number }) {
   }, []);
 
   const tryOpenSubtitle = useCallback(async () => {
+    const no = lessonNoRef.current;
     const settings = await getSettings().catch(() => null);
     const catMode = settings?.subtitleCatMode ?? true;
     const floating = settings?.floatingSubtitles !== false;
 
     if (!catMode && !floating) return;
 
-    const subtitle = await resolveSubtitlePath(lessonNo).catch(() => null);
+    const subtitle = await resolveSubtitlePath(no).catch(() => null);
     if (!catMode && !subtitle) {
       setSubtitleHint("未找到字幕文件：在与视频同目录放置同名 .srt 或 .vtt 后重新播放");
       return;
     }
 
-    await openSubtitleWindow(lessonNo).catch(() => undefined);
+    await openSubtitleWindow(no).catch(() => undefined);
     window.setTimeout(() => pushTimeUpdateRef.current?.(), 300);
     window.setTimeout(() => pushTimeUpdateRef.current?.(), 1000);
     if (floating && !subtitle) {
@@ -354,7 +357,7 @@ export default function VideoPlayer({ lessonNo }: { lessonNo: number }) {
     } else {
       setSubtitleHint(null);
     }
-  }, [lessonNo]);
+  }, []);
 
   useEffect(() => {
     const unlistenPromise = listen<number>("player-open", (event) => {
@@ -377,15 +380,17 @@ export default function VideoPlayer({ lessonNo }: { lessonNo: number }) {
     async function boot() {
       if (!containerRef.current) return;
       setError(null);
+      const bootLessonNo = lessonNo;
 
       try {
         const [plan, path] = await Promise.all([
           loadPlan() as Promise<PlanFile>,
-          resolveVideoPath(lessonNo),
+          resolveVideoPath(bootLessonNo),
         ]);
+        if (disposed || lessonNoRef.current !== bootLessonNo) return;
 
-        const lesson: PlanLesson | undefined = plan.lessons[String(lessonNo)];
-        const title = lesson?.title ?? `第 ${lessonNo} 节`;
+        const lesson: PlanLesson | undefined = plan.lessons[String(bootLessonNo)];
+        const title = lesson?.title ?? `第 ${bootLessonNo} 节`;
         setLessonTitle(title);
         getCurrentWindow().setTitle(title).catch(() => undefined);
 
@@ -395,13 +400,15 @@ export default function VideoPlayer({ lessonNo }: { lessonNo: number }) {
         }
 
         const url = convertFileSrc(path);
-        const saved = await fetchProgress(lessonNo);
+        const saved = await fetchProgress(bootLessonNo);
+        if (disposed || lessonNoRef.current !== bootLessonNo || !containerRef.current) {
+          return;
+        }
+
         lastKnownRef.current = {
           position: saved?.position ?? 0,
           duration: 0,
         };
-
-        if (disposed || !containerRef.current) return;
 
         Artplayer.CONTROL_HIDE_TIME = PLAYER_CONTROL_HIDE_MS;
         artRef.current?.destroy();
@@ -413,7 +420,7 @@ export default function VideoPlayer({ lessonNo }: { lessonNo: number }) {
           backdrop: true,
           playbackRate: false,
           setting: false,
-          controls: [buildNextLessonControl(lessonNo), buildPlaybackRateControl()],
+          controls: [buildNextLessonControl(bootLessonNo), buildPlaybackRateControl()],
           fullscreen: true,
           pip: true,
           mutex: true,
@@ -424,7 +431,11 @@ export default function VideoPlayer({ lessonNo }: { lessonNo: number }) {
         const win = getCurrentWindow();
         windowAspect = bindPlayerWindowAspect(win);
 
+        const activeLesson = () =>
+          !disposed && !closingRef.current && lessonNoRef.current === bootLessonNo;
+
         const syncWindowToVideo = () => {
+          if (!activeLesson()) return;
           const art = artRef.current;
           if (!art) return;
           const { videoWidth, videoHeight } = art.template.$video;
@@ -435,10 +446,12 @@ export default function VideoPlayer({ lessonNo }: { lessonNo: number }) {
         };
 
         const notePosition = (position: number, duration: number) => {
+          if (!activeLesson()) return;
           lastKnownRef.current = { position, duration };
         };
 
         const emitProgressUi = (force = false) => {
+          if (!activeLesson()) return;
           const art = artRef.current;
           if (!art) return;
           const now = Date.now();
@@ -447,10 +460,11 @@ export default function VideoPlayer({ lessonNo }: { lessonNo: number }) {
           const position = readVideoTime(art);
           const duration = art.duration || 0;
           notePosition(position, duration);
-          broadcastProgressUi(lessonNo, position, duration);
+          broadcastProgressUi(bootLessonNo, position, duration);
         };
 
         const persistProgress = (force = false) => {
+          if (!activeLesson()) return;
           const art = artRef.current;
           if (!art) return;
           const position = readVideoTime(art);
@@ -458,17 +472,18 @@ export default function VideoPlayer({ lessonNo }: { lessonNo: number }) {
           notePosition(position, duration);
           lastSaveAt = Date.now();
           emitProgressUi(true);
-          saveVideoProgress(lessonNo, position, duration).catch(() => undefined);
+          saveVideoProgress(bootLessonNo, position, duration).catch(() => undefined);
           if (force) pushTimeUpdateRef.current?.();
         };
 
         const pushTimeUpdate = () => {
+          if (!activeLesson()) return;
           const art = artRef.current;
           if (!art) return;
           const currentTime = readVideoTime(art);
           notePosition(currentTime, art.duration || lastKnownRef.current.duration);
           emit("player-timeupdate", {
-            lessonNo,
+            lessonNo: bootLessonNo,
             currentTime,
             playing: art.playing,
           }).catch(() => undefined);
@@ -476,6 +491,7 @@ export default function VideoPlayer({ lessonNo }: { lessonNo: number }) {
         pushTimeUpdateRef.current = pushTimeUpdate;
 
         artRef.current.on("ready", () => {
+          if (!activeLesson()) return;
           const art = artRef.current;
           if (!art) return;
           syncWindowToVideo();
@@ -498,19 +514,30 @@ export default function VideoPlayer({ lessonNo }: { lessonNo: number }) {
         });
 
         artRef.current.on("play", () => {
+          if (!activeLesson()) return;
           setPlaying(true);
           pushTimeUpdate();
-          emit("player-playback", { lessonNo, playing: true }).catch(() => undefined);
+          emit("player-playback", { lessonNo: bootLessonNo, playing: true }).catch(
+            () => undefined,
+          );
         });
         artRef.current.on("pause", () => {
+          if (!activeLesson()) return;
           setPlaying(false);
-          emit("player-playback", { lessonNo, playing: false }).catch(() => undefined);
+          emit("player-playback", { lessonNo: bootLessonNo, playing: false }).catch(
+            () => undefined,
+          );
+          persistProgress(true);
         });
         artRef.current.on("video:ended", () => {
+          if (!activeLesson()) return;
           setPlaying(false);
-          emit("player-playback", { lessonNo, playing: false }).catch(() => undefined);
+          emit("player-playback", { lessonNo: bootLessonNo, playing: false }).catch(
+            () => undefined,
+          );
         });
         artRef.current.on("video:seek", () => {
+          if (!activeLesson()) return;
           pushTimeUpdate();
           emitProgressUi(true);
           persistProgress(true);
@@ -519,6 +546,7 @@ export default function VideoPlayer({ lessonNo }: { lessonNo: number }) {
         artRef.current.on("video:loadedmetadata", syncWindowToVideo);
 
         artRef.current.on("pip", (enabled: boolean) => {
+          if (!activeLesson()) return;
           const art = artRef.current;
           if (!art) return;
 
@@ -534,10 +562,10 @@ export default function VideoPlayer({ lessonNo }: { lessonNo: number }) {
         });
 
         artRef.current.on("video:timeupdate", () => {
+          if (!activeLesson()) return;
           pushTimeUpdate();
           emitProgressUi();
           const now = Date.now();
-          // 节流落盘：连续播放时也保证周期性写盘（debounce 会永远不触发）
           if (now - lastSaveAt >= PROGRESS_SAVE_MS) {
             persistProgress();
           } else {
@@ -549,12 +577,11 @@ export default function VideoPlayer({ lessonNo }: { lessonNo: number }) {
         });
 
         await tryOpenSubtitle();
-
-        artRef.current.on("pause", () => {
-          persistProgress(true);
-        });
+        if (disposed || lessonNoRef.current !== bootLessonNo) return;
       } catch (e) {
-        setError(String(e));
+        if (!disposed && lessonNoRef.current === bootLessonNo) {
+          setError(String(e));
+        }
       }
     }
 
@@ -563,8 +590,16 @@ export default function VideoPlayer({ lessonNo }: { lessonNo: number }) {
     return () => {
       disposed = true;
       window.clearTimeout(saveTimer);
+      // 切课：尽力写一次当前课进度（关窗路径不落盘）
       if (!closingRef.current) {
-        flushVideoProgress(artRef, lessonNo, lastKnownRef).catch(() => undefined);
+        const art = artRef.current;
+        const position = art ? readVideoTime(art) : lastKnownRef.current.position;
+        const duration = art
+          ? art.duration || lastKnownRef.current.duration
+          : lastKnownRef.current.duration;
+        if (position > 0 || duration > 0) {
+          saveVideoProgress(lessonNo, position, duration).catch(() => undefined);
+        }
       }
       windowAspect?.dispose();
       closeSubtitleWindow(lessonNo).catch(() => undefined);

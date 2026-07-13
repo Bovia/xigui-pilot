@@ -542,6 +542,14 @@ export default function TodayPanel() {
     });
   }, []);
 
+  const liveProgressRef = useRef(
+    new Map<
+      number,
+      { position: number; duration: number; completed: boolean; at: number }
+    >(),
+  );
+  const LIVE_PROGRESS_HOLD_MS = 3000;
+
   const refresh = useCallback(async (options?: { silent?: boolean }) => {
     const silent = options?.silent ?? false;
     const container = panelScrollRef.current;
@@ -553,7 +561,24 @@ export default function TodayPanel() {
       const data = await getTodaySnapshot();
       setSnapshot(data);
       if (data.rootConfigured) {
-        setCatalog(await loadCatalog());
+        const loaded = await loadCatalog();
+        if (silent) {
+          const now = Date.now();
+          setCatalog(
+            loaded.map((lesson) => {
+              const live = liveProgressRef.current.get(lesson.no);
+              if (!live || now - live.at > LIVE_PROGRESS_HOLD_MS) return lesson;
+              return {
+                ...lesson,
+                position: live.position,
+                duration: live.duration || lesson.duration,
+                completed: lesson.completed || live.completed,
+              };
+            }),
+          );
+        } else {
+          setCatalog(loaded);
+        }
       } else {
         setCatalog([]);
       }
@@ -666,14 +691,20 @@ export default function TodayPanel() {
         prev.map((lesson) => {
           if (lesson.no !== lessonNo) return lesson;
           const nextDuration = duration || lesson.duration;
-          return {
-            ...lesson,
-            // 与播放头同步：显示「最新位置」，允许回退
+          const completed =
+            lesson.completed ||
+            (nextDuration > 0 && position / nextDuration >= 0.9);
+          liveProgressRef.current.set(lessonNo, {
             position,
             duration: nextDuration,
-            completed:
-              lesson.completed ||
-              (nextDuration > 0 && position / nextDuration >= 0.9),
+            completed,
+            at: Date.now(),
+          });
+          return {
+            ...lesson,
+            position,
+            duration: nextDuration,
+            completed,
           };
         }),
       );
