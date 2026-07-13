@@ -23,9 +23,47 @@ import {
 const DRAG_THRESHOLD_PX = 5;
 const CAT_SIT_FRAMES = ["/cow-cat-sit-1.png", "/cow-cat-sit-2.png", "/cow-cat-sit-3.png"];
 const CAT_REST_FRAMES = ["/cow-cat-rest-1.png", "/cow-cat-rest-2.png"];
-/** 坐姿尾巴摆动稍快，趴姿更慢更安静 */
-const TAIL_TICK_SIT_MS = 420;
-const TAIL_TICK_REST_MS = 900;
+/** 多数时间静，偶尔连摆三下；坐姿稍活跃，趴姿更懒 */
+const TAIL_WAG_STEPS = 3;
+const TAIL_SIT = {
+  idleMinMs: 1500,
+  idleMaxMs: 5000,
+  tickMinMs: 300,
+  tickMaxMs: 420,
+  shortIdleMs: 2500,
+  idleFrame: 1,
+  /** 从静止帧出发的两种三下路径，方向随机 */
+  wagPaths: [
+    [0, 1, 2],
+    [2, 1, 0],
+  ],
+} as const;
+const TAIL_REST = {
+  idleMinMs: 3000,
+  idleMaxMs: 9000,
+  tickMinMs: 700,
+  tickMaxMs: 1000,
+  shortIdleMs: 4000,
+  idleFrame: 0,
+  wagPaths: [[1, 0, 1]],
+} as const;
+
+function randBetween(min: number, max: number) {
+  return min + Math.random() * (max - min);
+}
+
+function pickIdleMs(
+  idleMinMs: number,
+  idleMaxMs: number,
+  shortIdleMs: number,
+  lastIdleMs: number | null,
+) {
+  if (lastIdleMs !== null && lastIdleMs < shortIdleMs) {
+    const mid = (idleMinMs + idleMaxMs) / 2;
+    return randBetween(mid, idleMaxMs);
+  }
+  return randBetween(idleMinMs, idleMaxMs);
+}
 
 export default function SubtitleOverlay({ lessonNo }: { lessonNo: number }) {
   const [cues, setCues] = useState<SubtitleCue[]>([]);
@@ -454,14 +492,50 @@ export default function SubtitleOverlay({ lessonNo }: { lessonNo: number }) {
     if (!currentText) hitRefs.current[0] = null;
   }, [currentText]);
 
-  // 尾巴轻摆：坐姿稍快，趴姿更慢更安静
+  // 尾巴：多数时间静，偶尔连摆三下（间隔随机，防连抖）
   useEffect(() => {
     if (!catMode) return;
-    const ms = restPose ? TAIL_TICK_REST_MS : TAIL_TICK_SIT_MS;
-    const id = window.setInterval(() => {
-      setTailFrame((f) => (f + 1) % 12);
-    }, ms);
-    return () => window.clearInterval(id);
+    const cfg = restPose ? TAIL_REST : TAIL_SIT;
+    let cancelled = false;
+    let timer: number | undefined;
+    let lastIdleMs: number | null = null;
+    let wagStep = 0;
+    let wagPath: readonly number[] = cfg.wagPaths[0];
+
+    const schedule = (ms: number, fn: () => void) => {
+      timer = window.setTimeout(() => {
+        if (!cancelled) fn();
+      }, ms);
+    };
+
+    const startIdle = () => {
+      setTailFrame(cfg.idleFrame);
+      const idleMs = pickIdleMs(cfg.idleMinMs, cfg.idleMaxMs, cfg.shortIdleMs, lastIdleMs);
+      lastIdleMs = idleMs;
+      schedule(idleMs, startWag);
+    };
+
+    const startWag = () => {
+      wagPath = cfg.wagPaths[Math.floor(Math.random() * cfg.wagPaths.length)]!;
+      wagStep = 0;
+      tickWag();
+    };
+
+    const tickWag = () => {
+      setTailFrame(wagPath[wagStep]!);
+      wagStep += 1;
+      if (wagStep >= TAIL_WAG_STEPS) {
+        schedule(randBetween(cfg.tickMinMs, cfg.tickMaxMs), startIdle);
+        return;
+      }
+      schedule(randBetween(cfg.tickMinMs, cfg.tickMaxMs), tickWag);
+    };
+
+    startIdle();
+    return () => {
+      cancelled = true;
+      if (timer !== undefined) window.clearTimeout(timer);
+    };
   }, [catMode, restPose]);
 
   useEffect(() => {

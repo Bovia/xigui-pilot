@@ -185,23 +185,13 @@ export function saveVideoProgress(
   return progressSaveChain;
 }
 
-/** 关窗前最终落盘：排空队列后再强制写一次，避免 webview 销毁打断队列 */
+/** 关窗/pagehide 最终落盘：直接写最新位置，不堵在长队列上 */
 export async function saveVideoProgressFinal(
   lessonNo: number,
   position: number,
   duration: number,
 ): Promise<void> {
   pendingProgress = { lessonNo, position, duration };
-  progressSaveChain = progressSaveChain
-    .catch(() => undefined)
-    .then(async () => {
-      while (pendingProgress) {
-        const next = pendingProgress;
-        pendingProgress = null;
-        await invoke("save_video_progress", next).catch(() => undefined);
-      }
-    });
-  await progressSaveChain;
   await invoke("save_video_progress", { lessonNo, position, duration }).catch(
     () => undefined,
   );

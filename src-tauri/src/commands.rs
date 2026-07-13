@@ -666,15 +666,12 @@ pub fn save_video_progress(
         let key = lesson_no.to_string();
         let prev = progress.videos.get(&key).cloned();
         let was_completed = prev.as_ref().map(|v| v.completed).unwrap_or(false);
-        // 观看进度只增不减：旧的 in-flight 写入无法把高进度打回低进度
-        let position = prev
-            .as_ref()
-            .map(|v| position.max(v.position))
-            .unwrap_or(position);
-        let duration = prev
-            .as_ref()
-            .map(|v| duration.max(v.duration))
-            .unwrap_or(duration);
+        // position = 最新播放头（可回退）；completed 一旦完成不清除
+        let duration = if duration > 0.0 {
+            duration
+        } else {
+            prev.as_ref().map(|v| v.duration).unwrap_or(0.0)
+        };
         let reached = duration > 0.0 && position / duration >= 0.9;
         let completed = was_completed || reached;
         let today = today_string();

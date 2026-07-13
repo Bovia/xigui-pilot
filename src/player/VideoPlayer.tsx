@@ -60,8 +60,10 @@ function teardownPlayer(artRef: React.MutableRefObject<Artplayer | null>) {
   artRef.current = null;
 }
 
-/** 进度写入磁盘间隔 */
+/** 播放中节流落盘间隔 */
 const PROGRESS_SAVE_MS = 1000;
+/** 自定义关窗时最多等落盘多久（超时也必须关） */
+const CLOSE_SAVE_BUDGET_MS = 400;
 /** 面板进度条 UI 刷新间隔（事件广播，不写盘） */
 const PROGRESS_UI_EMIT_MS = 300;
 
@@ -71,23 +73,20 @@ function broadcastProgressUi(lessonNo: number, position: number, duration: numbe
   emitTo("panel", "video-progress-updated", payload).catch(() => undefined);
 }
 
+/** 落盘最新播放头；art 已拆时用 lastKnown */
 function flushVideoProgress(
   artRef: React.MutableRefObject<Artplayer | null>,
   lessonNo: number,
-  furthestRef: React.MutableRefObject<number>,
+  lastKnown: React.MutableRefObject<{ position: number; duration: number }>,
 ): Promise<void> {
   const art = artRef.current;
-  if (!art) {
-    // 播放器已拆掉时仍把本会话最高进度落盘
-    if (furthestRef.current > 0) {
-      return saveVideoProgressFinal(lessonNo, furthestRef.current, 0);
-    }
-    return Promise.resolve();
+  let position = lastKnown.current.position;
+  let duration = lastKnown.current.duration;
+  if (art) {
+    position = readVideoTime(art);
+    duration = art.duration || duration;
+    lastKnown.current = { position, duration };
   }
-  const raw = readVideoTime(art);
-  const position = Math.max(raw, furthestRef.current);
-  furthestRef.current = position;
-  const duration = art.duration || 0;
   if (position <= 0 && duration <= 0) return Promise.resolve();
   broadcastProgressUi(lessonNo, position, duration);
   return saveVideoProgressFinal(lessonNo, position, duration);
@@ -198,7 +197,7 @@ export default function VideoPlayer({ lessonNo }: { lessonNo: number }) {
   const shellRef = useRef<HTMLDivElement>(null);
   const artRef = useRef<Artplayer | null>(null);
   const lessonNoRef = useRef(lessonNo);
-  const furthestPositionRef = useRef(0);
+  const lastKnownRef = useRef({ position: 0, duration: 0 });
   const closingRef = useRef(false);
   const pushTimeUpdateRef = useRef<(() => void) | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -224,40 +223,42 @@ export default function VideoPlayer({ lessonNo }: { lessonNo: number }) {
     lessonNoRef.current = lessonNo;
   }, [lessonNo]);
 
+  /** 自定义关闭热区：限时落盘 → 关字幕 → 销窗。不 teardown，避免黑框残留。 */
   const closePlayerWindow = useCallback(async () => {
     if (closingRef.current) return;
     closingRef.current = true;
     window.clearTimeout(chromeHideTimerRef.current);
     try {
-      // 必须先落盘完成再销毁窗口，否则红灯关闭会打断 in-flight invoke
-      await flushVideoProgress(artRef, lessonNo, furthestPositionRef);
-      teardownPlayer(artRef);
+      try {
+        artRef.current?.pause();
+      } catch {
+        /* ignore */
+      }
+      await Promise.race([
+        flushVideoProgress(artRef, lessonNo, lastKnownRef).catch(() => undefined),
+        new Promise<void>((resolve) =>
+          window.setTimeout(resolve, CLOSE_SAVE_BUDGET_MS),
+        ),
+      ]);
       pushTimeUpdateRef.current = null;
       await closeSubtitleWindow(lessonNo).catch(() => undefined);
-      await getCurrentWindow().destroy().catch(() => undefined);
+      try {
+        await getCurrentWindow().destroy();
+      } catch {
+        await getCurrentWindow().close().catch(() => undefined);
+        closingRef.current = false;
+      }
     } catch {
       closingRef.current = false;
     }
   }, [lessonNo]);
 
-  // 拦截系统关闭（红灯）：默认会立刻销毁 webview，进度保存来不及完成
-  useEffect(() => {
-    const win = getCurrentWindow();
-    const unlistenPromise = win.onCloseRequested(async (event) => {
-      event.preventDefault();
-      await closePlayerWindow();
-    });
-    return () => {
-      unlistenPromise.then((unlisten) => unlisten());
-    };
-  }, [closePlayerWindow]);
-
+  // 不拦截系统红灯：原生关闭必须立刻生效；进度靠播放中节流 + pagehide 尽力写
   useEffect(() => {
     const onPageHide = () => {
-      // 正常关闭已在 closePlayerWindow 里 await 落盘；此处兜底
-      if (closingRef.current) return;
-      flushVideoProgress(artRef, lessonNoRef.current, furthestPositionRef);
-      teardownPlayer(artRef);
+      flushVideoProgress(artRef, lessonNoRef.current, lastKnownRef).catch(
+        () => undefined,
+      );
       pushTimeUpdateRef.current = null;
     };
 
@@ -369,6 +370,7 @@ export default function VideoPlayer({ lessonNo }: { lessonNo: number }) {
   useEffect(() => {
     let disposed = false;
     let saveTimer: number | undefined;
+    let lastSaveAt = 0;
     let lastUiEmitAt = 0;
     let windowAspect: ReturnType<typeof bindPlayerWindowAspect> | undefined;
 
@@ -394,7 +396,10 @@ export default function VideoPlayer({ lessonNo }: { lessonNo: number }) {
 
         const url = convertFileSrc(path);
         const saved = await fetchProgress(lessonNo);
-        furthestPositionRef.current = saved?.position ?? 0;
+        lastKnownRef.current = {
+          position: saved?.position ?? 0,
+          duration: 0,
+        };
 
         if (disposed || !containerRef.current) return;
 
@@ -429,26 +434,29 @@ export default function VideoPlayer({ lessonNo }: { lessonNo: number }) {
             .catch(() => undefined);
         };
 
+        const notePosition = (position: number, duration: number) => {
+          lastKnownRef.current = { position, duration };
+        };
+
         const emitProgressUi = (force = false) => {
           const art = artRef.current;
           if (!art) return;
           const now = Date.now();
           if (!force && now - lastUiEmitAt < PROGRESS_UI_EMIT_MS) return;
           lastUiEmitAt = now;
-          const raw = readVideoTime(art);
-          if (raw > furthestPositionRef.current) furthestPositionRef.current = raw;
-          const position = furthestPositionRef.current;
+          const position = readVideoTime(art);
           const duration = art.duration || 0;
+          notePosition(position, duration);
           broadcastProgressUi(lessonNo, position, duration);
         };
 
         const persistProgress = (force = false) => {
           const art = artRef.current;
           if (!art) return;
-          const raw = readVideoTime(art);
-          if (raw > furthestPositionRef.current) furthestPositionRef.current = raw;
-          const position = furthestPositionRef.current;
+          const position = readVideoTime(art);
           const duration = art.duration || 0;
+          notePosition(position, duration);
+          lastSaveAt = Date.now();
           emitProgressUi(true);
           saveVideoProgress(lessonNo, position, duration).catch(() => undefined);
           if (force) pushTimeUpdateRef.current?.();
@@ -458,9 +466,7 @@ export default function VideoPlayer({ lessonNo }: { lessonNo: number }) {
           const art = artRef.current;
           if (!art) return;
           const currentTime = readVideoTime(art);
-          if (currentTime > furthestPositionRef.current) {
-            furthestPositionRef.current = currentTime;
-          }
+          notePosition(currentTime, art.duration || lastKnownRef.current.duration);
           emit("player-timeupdate", {
             lessonNo,
             currentTime,
@@ -507,6 +513,7 @@ export default function VideoPlayer({ lessonNo }: { lessonNo: number }) {
         artRef.current.on("video:seek", () => {
           pushTimeUpdate();
           emitProgressUi(true);
+          persistProgress(true);
         });
 
         artRef.current.on("video:loadedmetadata", syncWindowToVideo);
@@ -529,12 +536,16 @@ export default function VideoPlayer({ lessonNo }: { lessonNo: number }) {
         artRef.current.on("video:timeupdate", () => {
           pushTimeUpdate();
           emitProgressUi();
-          const art = artRef.current;
-          if (!art) return;
-          window.clearTimeout(saveTimer);
-          saveTimer = window.setTimeout(() => {
+          const now = Date.now();
+          // 节流落盘：连续播放时也保证周期性写盘（debounce 会永远不触发）
+          if (now - lastSaveAt >= PROGRESS_SAVE_MS) {
             persistProgress();
-          }, PROGRESS_SAVE_MS);
+          } else {
+            window.clearTimeout(saveTimer);
+            saveTimer = window.setTimeout(() => {
+              persistProgress();
+            }, PROGRESS_SAVE_MS - (now - lastSaveAt));
+          }
         });
 
         await tryOpenSubtitle();
@@ -553,7 +564,7 @@ export default function VideoPlayer({ lessonNo }: { lessonNo: number }) {
       disposed = true;
       window.clearTimeout(saveTimer);
       if (!closingRef.current) {
-        flushVideoProgress(artRef, lessonNo, furthestPositionRef);
+        flushVideoProgress(artRef, lessonNo, lastKnownRef).catch(() => undefined);
       }
       windowAspect?.dispose();
       closeSubtitleWindow(lessonNo).catch(() => undefined);

@@ -665,19 +665,18 @@ export default function TodayPanel() {
       setCatalog((prev) =>
         prev.map((lesson) => {
           if (lesson.no !== lessonNo) return lesson;
-          // 实时事件也可能乱序到达，面板显示进度不允许回退
-          const nextPosition = Math.max(lesson.position, position);
+          const nextDuration = duration || lesson.duration;
           return {
             ...lesson,
-            position: nextPosition,
-            duration: duration || lesson.duration,
+            // 与播放头同步：显示「最新位置」，允许回退
+            position,
+            duration: nextDuration,
             completed:
               lesson.completed ||
-              (duration > 0 && nextPosition / duration >= 0.9),
+              (nextDuration > 0 && position / nextDuration >= 0.9),
           };
         }),
       );
-      // 不在此从磁盘重拉 todayProgress：磁盘可能滞后，会把实时 24min 打回 8min
     });
     return () => {
       unlistenPromise.then((unlisten) => unlisten());
