@@ -20,6 +20,7 @@ import {
   quitApp,
   setPanelPinned,
   setFloatingSubtitles,
+  setSubtitleCatMode,
   setLaunchAtLogin,
   setWovenStyle,
   syncPaceTodayLock,
@@ -513,6 +514,7 @@ export default function TodayPanel() {
   const [pinned, setPinned] = useState(true);
   const [wovenStyle, setWovenStyleOn] = useState(false);
   const [floatingSubtitles, setFloatingSubtitlesOn] = useState(true);
+  const [subtitleCatMode, setSubtitleCatModeOn] = useState(true);
   const [launchAtLogin, setLaunchAtLoginOn] = useState(false);
   const [guideOpen, setGuideOpen] = useState(false);
   const [planOpen, setPlanOpen] = useState(false);
@@ -647,6 +649,7 @@ export default function TodayPanel() {
       .then((s) => {
         setWovenStyleOn(s.wovenStyle ?? false);
         setFloatingSubtitlesOn(s.floatingSubtitles ?? true);
+        setSubtitleCatModeOn(s.subtitleCatMode ?? true);
         setLaunchAtLoginOn(s.launchAtLogin ?? false);
       })
       .catch(() => undefined);
@@ -660,29 +663,26 @@ export default function TodayPanel() {
     }>("video-progress-updated", (event) => {
       const { lessonNo, position, duration } = event.payload;
       setCatalog((prev) =>
-        prev.map((lesson) =>
-          lesson.no === lessonNo
-            ? {
-                ...lesson,
-                position,
-                duration: duration || lesson.duration,
-                completed: lesson.completed || (duration > 0 && position / duration >= 0.9),
-              }
-            : lesson,
-        ),
+        prev.map((lesson) => {
+          if (lesson.no !== lessonNo) return lesson;
+          // 实时事件也可能乱序到达，面板显示进度不允许回退
+          const nextPosition = Math.max(lesson.position, position);
+          return {
+            ...lesson,
+            position: nextPosition,
+            duration: duration || lesson.duration,
+            completed:
+              lesson.completed ||
+              (duration > 0 && nextPosition / duration >= 0.9),
+          };
+        }),
       );
-      if (!snapshot) return;
-      loadPanelMeta(snapshot)
-        .then((meta) => {
-          setTodayProgress(meta.todayProgress);
-          setTodayMarquee(meta.todayText);
-        })
-        .catch(() => undefined);
+      // 不在此从磁盘重拉 todayProgress：磁盘可能滞后，会把实时 24min 打回 8min
     });
     return () => {
       unlistenPromise.then((unlisten) => unlisten());
     };
-  }, [snapshot]);
+  }, []);
 
   useEffect(() => {
     const onFocus = () => {
@@ -918,6 +918,16 @@ export default function TodayPanel() {
     }
   };
 
+  const toggleSubtitleCatMode = async () => {
+    const next = !subtitleCatMode;
+    try {
+      await setSubtitleCatMode(next);
+      setSubtitleCatModeOn(next);
+    } catch (e) {
+      setError(String(e));
+    }
+  };
+
   const headerWeekLabel = wenBenchmark?.weekLabel ?? snapshot?.weekLabel;
 
   const playableCount = catalog.filter((l) => !l.missing).length;
@@ -1049,6 +1059,14 @@ export default function TodayPanel() {
                   className="w-full px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50"
                 >
                   {floatingSubtitles ? "✓ 桌面悬浮字幕" : "桌面悬浮字幕"}
+                </button>
+                <button
+                  type="button"
+                  onClick={toggleSubtitleCatMode}
+                  disabled={!floatingSubtitles}
+                  className="w-full px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 disabled:opacity-40"
+                >
+                  {subtitleCatMode ? "✓ 猫猫模式" : "猫猫模式"}
                 </button>
                 <button
                   type="button"

@@ -1,5 +1,13 @@
 @import "tailwindcss";
 
+@font-face {
+  font-family: "Fusion Pixel";
+  src: url("/fonts/fusion-pixel-zh-hans.woff2") format("woff2");
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
 html,
 body,
 #root {
@@ -254,7 +262,7 @@ button {
 .subtitle-bar {
   border-radius: 0.75rem;
   background: rgba(15, 23, 42, 0.82);
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  border: none;
   box-shadow:
     0 12px 32px rgba(0, 0, 0, 0.35),
     0 2px 8px rgba(0, 0, 0, 0.2);
@@ -286,6 +294,140 @@ button {
   color: rgba(248, 250, 252, 0.45);
 }
 
+.subtitle-cat-shell {
+  pointer-events: none;
+  box-sizing: border-box;
+  padding: 0.35rem 0.45rem 0.25rem;
+  overflow: hidden;
+}
+
+.subtitle-cat-stack {
+  pointer-events: none;
+  display: flex;
+  flex-direction: column;
+  max-width: min(100%, 420px);
+  gap: 0.7rem;
+}
+
+.subtitle-cat-stack--right {
+  align-items: flex-end;
+  margin-left: auto;
+}
+
+.subtitle-cat-stack--left {
+  align-items: flex-start;
+  margin-right: auto;
+}
+
+.subtitle-bubble {
+  pointer-events: auto;
+  position: relative;
+  max-width: 100%;
+  border-radius: 0;
+  /* pixel-ish border via stepped box-shadow */
+  background: rgba(20, 24, 36, 0.94);
+  box-shadow:
+    0 -3px 0 0 #1e293b,
+    0 3px 0 0 #1e293b,
+    -3px 0 0 0 #1e293b,
+    3px 0 0 0 #1e293b,
+    0 8px 18px rgba(0, 0, 0, 0.28);
+  padding: 0.55rem 0.75rem 0.6rem;
+  text-align: center;
+  font-family: "Fusion Pixel", "PingFang SC", sans-serif;
+  image-rendering: pixelated;
+}
+
+.subtitle-bubble--visible {
+  opacity: 1;
+}
+
+.subtitle-bubble .subtitle-current,
+.subtitle-bubble .subtitle-next,
+.subtitle-bubble .subtitle-placeholder {
+  font-family: inherit;
+  font-weight: normal;
+  letter-spacing: 0.02em;
+}
+
+.subtitle-bubble .subtitle-current {
+  font-size: 0.95rem;
+  line-height: 1.55;
+}
+
+.subtitle-bubble .subtitle-next {
+  margin-top: 0.3rem;
+  font-size: 0.72rem;
+  line-height: 1.45;
+  color: rgba(248, 250, 252, 0.58);
+}
+
+.subtitle-bubble::after {
+  content: "";
+  position: absolute;
+  bottom: -9px;
+  width: 0;
+  height: 0;
+  border-left: 8px solid transparent;
+  border-right: 8px solid transparent;
+  border-top: 9px solid rgba(20, 24, 36, 0.94);
+}
+
+.subtitle-cat-stack--right .subtitle-bubble::after {
+  right: 1.7rem;
+  left: auto;
+}
+
+.subtitle-cat-stack--left .subtitle-bubble::after {
+  left: 1.7rem;
+  right: auto;
+}
+
+.subtitle-cat-pet {
+  pointer-events: auto;
+  width: 64px;
+  height: 64px;
+  object-fit: contain;
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+  flex-shrink: 0;
+  filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.22));
+  user-select: none;
+  -webkit-user-drag: none;
+}
+
+.subtitle-cat-pet--talk {
+  width: 70px;
+  height: 80px;
+  /* 尾巴摆动靠切帧完成，身体只保留极弱呼吸，避免和尾巴抢戏 */
+  animation: subtitle-cat-breathe-soft 3.6s ease-in-out infinite;
+}
+
+.subtitle-cat-pet--rest {
+  width: 96px;
+  height: 75px;
+  animation: subtitle-cat-breathe 4.4s ease-in-out infinite;
+}
+
+@keyframes subtitle-cat-breathe-soft {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.015);
+  }
+}
+
+@keyframes subtitle-cat-breathe {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.02);
+  }
+}
 .artplayer-app {
   width: 100%;
   height: 100%;

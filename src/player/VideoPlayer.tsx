@@ -15,6 +15,7 @@ import {
   resolveSubtitlePath,
   resolveVideoPath,
   saveVideoProgress,
+  saveVideoProgressFinal,
   setPlayerChromeVisible,
   setPlayerPinned,
 } from "../lib/api";
@@ -73,14 +74,29 @@ function broadcastProgressUi(lessonNo: number, position: number, duration: numbe
 function flushVideoProgress(
   artRef: React.MutableRefObject<Artplayer | null>,
   lessonNo: number,
-) {
+  furthestRef: React.MutableRefObject<number>,
+): Promise<void> {
   const art = artRef.current;
-  if (!art) return;
-  const position = art.currentTime;
+  if (!art) {
+    // 播放器已拆掉时仍把本会话最高进度落盘
+    if (furthestRef.current > 0) {
+      return saveVideoProgressFinal(lessonNo, furthestRef.current, 0);
+    }
+    return Promise.resolve();
+  }
+  const raw = readVideoTime(art);
+  const position = Math.max(raw, furthestRef.current);
+  furthestRef.current = position;
   const duration = art.duration || 0;
-  if (position <= 0 && duration <= 0) return;
-  saveVideoProgress(lessonNo, position, duration).catch(() => undefined);
+  if (position <= 0 && duration <= 0) return Promise.resolve();
   broadcastProgressUi(lessonNo, position, duration);
+  return saveVideoProgressFinal(lessonNo, position, duration);
+}
+
+function readVideoTime(art: Artplayer): number {
+  const video = art.template?.$video as HTMLVideoElement | undefined;
+  const t = video?.currentTime ?? art.currentTime ?? 0;
+  return Number.isFinite(t) ? t : 0;
 }
 
 function formatPlaybackRate(rate: number): string {
@@ -182,6 +198,8 @@ export default function VideoPlayer({ lessonNo }: { lessonNo: number }) {
   const shellRef = useRef<HTMLDivElement>(null);
   const artRef = useRef<Artplayer | null>(null);
   const lessonNoRef = useRef(lessonNo);
+  const furthestPositionRef = useRef(0);
+  const closingRef = useRef(false);
   const pushTimeUpdateRef = useRef<(() => void) | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [subtitleHint, setSubtitleHint] = useState<string | null>(null);
@@ -207,17 +225,38 @@ export default function VideoPlayer({ lessonNo }: { lessonNo: number }) {
   }, [lessonNo]);
 
   const closePlayerWindow = useCallback(async () => {
+    if (closingRef.current) return;
+    closingRef.current = true;
     window.clearTimeout(chromeHideTimerRef.current);
-    flushVideoProgress(artRef, lessonNo);
-    teardownPlayer(artRef);
-    pushTimeUpdateRef.current = null;
-    await closeSubtitleWindow(lessonNo).catch(() => undefined);
-    await getCurrentWindow().destroy().catch(() => undefined);
+    try {
+      // 必须先落盘完成再销毁窗口，否则红灯关闭会打断 in-flight invoke
+      await flushVideoProgress(artRef, lessonNo, furthestPositionRef);
+      teardownPlayer(artRef);
+      pushTimeUpdateRef.current = null;
+      await closeSubtitleWindow(lessonNo).catch(() => undefined);
+      await getCurrentWindow().destroy().catch(() => undefined);
+    } catch {
+      closingRef.current = false;
+    }
   }, [lessonNo]);
+
+  // 拦截系统关闭（红灯）：默认会立刻销毁 webview，进度保存来不及完成
+  useEffect(() => {
+    const win = getCurrentWindow();
+    const unlistenPromise = win.onCloseRequested(async (event) => {
+      event.preventDefault();
+      await closePlayerWindow();
+    });
+    return () => {
+      unlistenPromise.then((unlisten) => unlisten());
+    };
+  }, [closePlayerWindow]);
 
   useEffect(() => {
     const onPageHide = () => {
-      flushVideoProgress(artRef, lessonNoRef.current);
+      // 正常关闭已在 closePlayerWindow 里 await 落盘；此处兜底
+      if (closingRef.current) return;
+      flushVideoProgress(artRef, lessonNoRef.current, furthestPositionRef);
       teardownPlayer(artRef);
       pushTimeUpdateRef.current = null;
     };
@@ -295,18 +334,25 @@ export default function VideoPlayer({ lessonNo }: { lessonNo: number }) {
 
   const tryOpenSubtitle = useCallback(async () => {
     const settings = await getSettings().catch(() => null);
-    if (settings?.floatingSubtitles === false) return;
+    const catMode = settings?.subtitleCatMode ?? true;
+    const floating = settings?.floatingSubtitles !== false;
+
+    if (!catMode && !floating) return;
 
     const subtitle = await resolveSubtitlePath(lessonNo).catch(() => null);
-    if (subtitle) {
-      await openSubtitleWindow(lessonNo).catch(() => undefined);
-      window.setTimeout(() => pushTimeUpdateRef.current?.(), 300);
-      window.setTimeout(() => pushTimeUpdateRef.current?.(), 1000);
-      setSubtitleHint(null);
+    if (!catMode && !subtitle) {
+      setSubtitleHint("未找到字幕文件：在与视频同目录放置同名 .srt 或 .vtt 后重新播放");
       return;
     }
 
-    setSubtitleHint("未找到字幕文件：在与视频同目录放置同名 .srt 或 .vtt 后重新播放");
+    await openSubtitleWindow(lessonNo).catch(() => undefined);
+    window.setTimeout(() => pushTimeUpdateRef.current?.(), 300);
+    window.setTimeout(() => pushTimeUpdateRef.current?.(), 1000);
+    if (floating && !subtitle) {
+      setSubtitleHint("未找到字幕文件：在与视频同目录放置同名 .srt 或 .vtt 后重新播放");
+    } else {
+      setSubtitleHint(null);
+    }
   }, [lessonNo]);
 
   useEffect(() => {
@@ -348,6 +394,7 @@ export default function VideoPlayer({ lessonNo }: { lessonNo: number }) {
 
         const url = convertFileSrc(path);
         const saved = await fetchProgress(lessonNo);
+        furthestPositionRef.current = saved?.position ?? 0;
 
         if (disposed || !containerRef.current) return;
 
@@ -388,7 +435,9 @@ export default function VideoPlayer({ lessonNo }: { lessonNo: number }) {
           const now = Date.now();
           if (!force && now - lastUiEmitAt < PROGRESS_UI_EMIT_MS) return;
           lastUiEmitAt = now;
-          const position = art.currentTime;
+          const raw = readVideoTime(art);
+          if (raw > furthestPositionRef.current) furthestPositionRef.current = raw;
+          const position = furthestPositionRef.current;
           const duration = art.duration || 0;
           broadcastProgressUi(lessonNo, position, duration);
         };
@@ -396,19 +445,26 @@ export default function VideoPlayer({ lessonNo }: { lessonNo: number }) {
         const persistProgress = (force = false) => {
           const art = artRef.current;
           if (!art) return;
-          const position = art.currentTime;
+          const raw = readVideoTime(art);
+          if (raw > furthestPositionRef.current) furthestPositionRef.current = raw;
+          const position = furthestPositionRef.current;
           const duration = art.duration || 0;
-          saveVideoProgress(lessonNo, position, duration).catch(() => undefined);
           emitProgressUi(true);
+          saveVideoProgress(lessonNo, position, duration).catch(() => undefined);
           if (force) pushTimeUpdateRef.current?.();
         };
 
         const pushTimeUpdate = () => {
           const art = artRef.current;
           if (!art) return;
+          const currentTime = readVideoTime(art);
+          if (currentTime > furthestPositionRef.current) {
+            furthestPositionRef.current = currentTime;
+          }
           emit("player-timeupdate", {
             lessonNo,
-            currentTime: art.currentTime,
+            currentTime,
+            playing: art.playing,
           }).catch(() => undefined);
         };
         pushTimeUpdateRef.current = pushTimeUpdate;
@@ -438,9 +494,16 @@ export default function VideoPlayer({ lessonNo }: { lessonNo: number }) {
         artRef.current.on("play", () => {
           setPlaying(true);
           pushTimeUpdate();
+          emit("player-playback", { lessonNo, playing: true }).catch(() => undefined);
         });
-        artRef.current.on("pause", () => setPlaying(false));
-        artRef.current.on("video:ended", () => setPlaying(false));
+        artRef.current.on("pause", () => {
+          setPlaying(false);
+          emit("player-playback", { lessonNo, playing: false }).catch(() => undefined);
+        });
+        artRef.current.on("video:ended", () => {
+          setPlaying(false);
+          emit("player-playback", { lessonNo, playing: false }).catch(() => undefined);
+        });
         artRef.current.on("video:seek", () => {
           pushTimeUpdate();
           emitProgressUi(true);
@@ -489,7 +552,9 @@ export default function VideoPlayer({ lessonNo }: { lessonNo: number }) {
     return () => {
       disposed = true;
       window.clearTimeout(saveTimer);
-      flushVideoProgress(artRef, lessonNo);
+      if (!closingRef.current) {
+        flushVideoProgress(artRef, lessonNo, furthestPositionRef);
+      }
       windowAspect?.dispose();
       closeSubtitleWindow(lessonNo).catch(() => undefined);
       pushTimeUpdateRef.current = null;

@@ -162,12 +162,50 @@ export const openPlayer = (lessonNo: number) =>
 export const resolveVideoPath = (lessonNo: number) =>
   invoke<string>("resolve_video_path", { lessonNo });
 
-export const saveVideoProgress = (
+/** 进度落盘：合并为「最新一条」并串行写入，避免并发 RMW 用旧 position 覆盖新进度 */
+type PendingProgress = { lessonNo: number; position: number; duration: number };
+let pendingProgress: PendingProgress | null = null;
+let progressSaveChain: Promise<void> = Promise.resolve();
+
+export function saveVideoProgress(
   lessonNo: number,
   position: number,
   duration: number,
-) =>
-  invoke("save_video_progress", { lessonNo, position, duration });
+): Promise<void> {
+  pendingProgress = { lessonNo, position, duration };
+  progressSaveChain = progressSaveChain
+    .catch(() => undefined)
+    .then(async () => {
+      while (pendingProgress) {
+        const next = pendingProgress;
+        pendingProgress = null;
+        await invoke("save_video_progress", next).catch(() => undefined);
+      }
+    });
+  return progressSaveChain;
+}
+
+/** 关窗前最终落盘：排空队列后再强制写一次，避免 webview 销毁打断队列 */
+export async function saveVideoProgressFinal(
+  lessonNo: number,
+  position: number,
+  duration: number,
+): Promise<void> {
+  pendingProgress = { lessonNo, position, duration };
+  progressSaveChain = progressSaveChain
+    .catch(() => undefined)
+    .then(async () => {
+      while (pendingProgress) {
+        const next = pendingProgress;
+        pendingProgress = null;
+        await invoke("save_video_progress", next).catch(() => undefined);
+      }
+    });
+  await progressSaveChain;
+  await invoke("save_video_progress", { lessonNo, position, duration }).catch(
+    () => undefined,
+  );
+}
 
 export const openExternalVideo = (lessonNo: number) =>
   invoke<void>("open_external_video", { lessonNo });
@@ -228,6 +266,9 @@ export const closeSubtitleWindow = (lessonNo: number) =>
 
 export const setFloatingSubtitles = (enabled: boolean) =>
   invoke<Settings>("set_floating_subtitles", { enabled });
+
+export const setSubtitleCatMode = (enabled: boolean) =>
+  invoke<Settings>("set_subtitle_cat_mode", { enabled });
 
 export const setLaunchAtLogin = (enabled: boolean) =>
   invoke<Settings>("set_launch_at_login", { enabled });

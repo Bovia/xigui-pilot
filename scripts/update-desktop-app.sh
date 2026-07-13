@@ -11,6 +11,10 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 APP="$ROOT/src-tauri/target/release/bundle/macos/系规助手.app"
 DESKTOP="$HOME/Desktop/系规助手"
 
+# 菜单栏 App 不退出会继续跑旧二进制，重建后必须先杀掉
+pkill -x xigui-pilot 2>/dev/null || true
+sleep 0.3
+
 cd "$ROOT"
 CARGO_TARGET_DIR="$ROOT/src-tauri/target" pnpm tauri build
 
@@ -26,4 +30,4 @@ else
   echo "桌面快捷方式已存在，App 已更新：$APP"
 fi
 
-echo "完成。双击桌面「系规助手」即可启动。"
+echo "完成。请先确认菜单栏旧进程已退出，再双击桌面「系规助手」启动。"

@@ -1,13 +1,33 @@
 use crate::progress::{progress_path, PaceTodayLock, ProgressStore, VideoProgress};
 use crate::settings::{settings_path, Settings};
-use crate::{activate_for_action, close_subtitle_window, ensure_player_window, ensure_subtitle_window, restore_accessory, set_panel_hide_suppressed};
+use crate::{
+    activate_for_action, close_subtitle_window, ensure_player_window, ensure_subtitle_window,
+    refresh_subtitle_windows_for_mode, restore_accessory, set_panel_hide_suppressed,
+};
 use chrono::{Local, NaiveDate};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::sync::Mutex;
 use tauri::{AppHandle, Emitter, Manager};
+
+static PROGRESS_WRITE_LOCK: Mutex<()> = Mutex::new(());
+
+/// 所有对 progress.json 的读改写必须走这里，避免 sync_pace / quiz 等用旧快照盖掉观看进度
+fn with_progress_mut<F, T>(app: &AppHandle, f: F) -> Result<T, String>
+where
+    F: FnOnce(&mut ProgressStore) -> Result<T, String>,
+{
+    let _guard = PROGRESS_WRITE_LOCK
+        .lock()
+        .map_err(|e| e.to_string())?;
+    let (path, mut progress) = progress_for(app)?;
+    let result = f(&mut progress)?;
+    progress.save(&path)?;
+    Ok(result)
+}
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
@@ -642,45 +662,44 @@ pub fn save_video_progress(
     position: f64,
     duration: f64,
 ) -> Result<VideoProgress, String> {
-    let (path, mut progress) = progress_for(&app)?;
-    let key = lesson_no.to_string();
-    let was_completed = progress
-        .videos
-        .get(&key)
-        .map(|v| v.completed)
-        .unwrap_or(false);
-    let reached = duration > 0.0 && position / duration >= 0.9;
-    let completed = was_completed || reached;
-    let today = today_string();
-    let entry = VideoProgress {
-        position,
-        duration,
-        completed,
-        updated_at: Local::now().to_rfc3339(),
-        last_activity_date: Some(today),
-    };
-    progress
-        .videos
-        .insert(lesson_no.to_string(), entry.clone());
-    progress.save(&path)?;
+    let entry = with_progress_mut(&app, |progress| {
+        let key = lesson_no.to_string();
+        let prev = progress.videos.get(&key).cloned();
+        let was_completed = prev.as_ref().map(|v| v.completed).unwrap_or(false);
+        // 观看进度只增不减：旧的 in-flight 写入无法把高进度打回低进度
+        let position = prev
+            .as_ref()
+            .map(|v| position.max(v.position))
+            .unwrap_or(position);
+        let duration = prev
+            .as_ref()
+            .map(|v| duration.max(v.duration))
+            .unwrap_or(duration);
+        let reached = duration > 0.0 && position / duration >= 0.9;
+        let completed = was_completed || reached;
+        let today = today_string();
+        let entry = VideoProgress {
+            position,
+            duration,
+            completed,
+            updated_at: Local::now().to_rfc3339(),
+            last_activity_date: Some(today),
+        };
+        progress
+            .videos
+            .insert(lesson_no.to_string(), entry.clone());
+        Ok(entry)
+    })?;
     crate::refresh_tray_badge(&app);
-    let _ = app.emit_to(
-        "panel",
-        "video-progress-updated",
-        serde_json::json!({
-            "lessonNo": lesson_no,
-            "position": position,
-            "duration": duration,
-        }),
-    );
     Ok(entry)
 }
 
 #[tauri::command]
 pub fn mark_task_done(app: AppHandle, task_id: String, done: bool) -> Result<(), String> {
-    let (path, mut progress) = progress_for(&app)?;
-    progress.tasks.insert(task_id, done);
-    progress.save(&path)?;
+    with_progress_mut(&app, |progress| {
+        progress.tasks.insert(task_id, done);
+        Ok(())
+    })?;
     crate::refresh_tray_badge(&app);
     Ok(())
 }
@@ -946,12 +965,20 @@ pub fn resolve_subtitle_path(app: AppHandle, lesson_no: u32) -> Result<Option<Su
 #[tauri::command]
 pub fn open_subtitle_window(app: AppHandle, lesson_no: u32) -> Result<(), String> {
     let (_, settings) = settings_for(&app)?;
-    if !settings.floating_subtitles() {
-        return Ok(());
+    let cat_mode = settings.subtitle_cat_mode();
+    let floating = settings.floating_subtitles();
+
+    // 常规字幕条：需要开启悬浮字幕且有字幕文件
+    // 猫猫模式：只要开了猫猫就建窗（可无字幕文件，安静陪伴）
+    if !cat_mode {
+        if !floating {
+            return Ok(());
+        }
+        if resolve_subtitle_path_inner(&app, lesson_no)?.is_none() {
+            return Ok(());
+        }
     }
-    if resolve_subtitle_path_inner(&app, lesson_no)?.is_none() {
-        return Ok(());
-    }
+
     ensure_subtitle_window(&app, lesson_no)
 }
 
@@ -966,7 +993,9 @@ pub fn set_floating_subtitles(app: AppHandle, enabled: bool) -> Result<Settings,
     let (path, mut settings) = settings_for(&app)?;
     settings.floating_subtitles = Some(enabled);
     settings.save(&path)?;
-    if !enabled {
+
+    let cat_mode = settings.subtitle_cat_mode();
+    if !enabled && !cat_mode {
         let windows: Vec<String> = app
             .webview_windows()
             .keys()
@@ -979,6 +1008,39 @@ pub fn set_floating_subtitles(app: AppHandle, enabled: bool) -> Result<Settings,
             }
         }
     } else {
+        open_subtitles_for_active_players(&app);
+        for (label, window) in app.webview_windows() {
+            if label.starts_with("subtitle-") {
+                let _ = window.emit("floating-subtitles", enabled);
+            }
+        }
+    }
+    Ok(settings)
+}
+
+#[tauri::command]
+pub fn set_subtitle_cat_mode(app: AppHandle, enabled: bool) -> Result<Settings, String> {
+    let (path, mut settings) = settings_for(&app)?;
+    settings.subtitle_cat_mode = Some(enabled);
+    settings.save(&path)?;
+
+    if enabled {
+        open_subtitles_for_active_players(&app);
+        refresh_subtitle_windows_for_mode(&app, true);
+    } else if !settings.floating_subtitles() {
+        let windows: Vec<String> = app
+            .webview_windows()
+            .keys()
+            .filter(|label| label.starts_with("subtitle-"))
+            .cloned()
+            .collect();
+        for label in windows {
+            if let Some(window) = app.get_webview_window(&label) {
+                let _ = window.close();
+            }
+        }
+    } else {
+        refresh_subtitle_windows_for_mode(&app, false);
         open_subtitles_for_active_players(&app);
     }
     Ok(settings)
@@ -1382,11 +1444,12 @@ pub fn toggle_quiz_done(app: AppHandle, lesson_no: u32) -> Result<ToggleQuizResu
         .and_then(|v| v.as_str())
         .unwrap_or("");
     let key = quiz_chapter_key(title);
-    let (path, mut progress) = progress_for(&app)?;
-    let current = progress.quiz_done.get(&key).copied().unwrap_or(false);
-    let done = !current;
-    progress.quiz_done.insert(key.clone(), done);
-    progress.save(&path)?;
+    let done = with_progress_mut(&app, |progress| {
+        let current = progress.quiz_done.get(&key).copied().unwrap_or(false);
+        let done = !current;
+        progress.quiz_done.insert(key.clone(), done);
+        Ok(done)
+    })?;
     Ok(ToggleQuizResult {
         chapter_key: key,
         done,
@@ -1440,13 +1503,14 @@ pub fn sync_pace_today_lock(
     daily_hours: f64,
     lesson_nos: Vec<u32>,
 ) -> Result<(), String> {
-    let (path, mut progress) = progress_for(&app)?;
-    progress.pace_today = Some(PaceTodayLock {
-        date,
-        daily_hours,
-        lesson_nos,
-    });
-    progress.save(&path)?;
+    with_progress_mut(&app, |progress| {
+        progress.pace_today = Some(PaceTodayLock {
+            date,
+            daily_hours,
+            lesson_nos,
+        });
+        Ok(())
+    })?;
     crate::refresh_tray_badge(&app);
     Ok(())
 }

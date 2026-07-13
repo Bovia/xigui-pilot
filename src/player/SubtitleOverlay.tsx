@@ -1,19 +1,31 @@
 import { convertFileSrc } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import { PhysicalPosition, getCurrentWindow } from "@tauri-apps/api/window";
+import {
+  PhysicalPosition,
+  currentMonitor,
+  cursorPosition,
+  getCurrentWindow,
+} from "@tauri-apps/api/window";
 import { WebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { resolveSubtitlePath } from "../lib/api";
+import { getSettings, resolveSubtitlePath } from "../lib/api";
 import {
   cueAtTime,
   loadSubtitlePosition,
   nextCue,
   parseSubtitles,
+  resolveCatCompanionView,
   saveSubtitlePosition,
+  type CatPlayback,
   type SubtitleCue,
 } from "../lib/subtitles";
 
 const DRAG_THRESHOLD_PX = 5;
+const CAT_SIT_FRAMES = ["/cow-cat-sit-1.png", "/cow-cat-sit-2.png", "/cow-cat-sit-3.png"];
+const CAT_REST_FRAMES = ["/cow-cat-rest-1.png", "/cow-cat-rest-2.png"];
+/** 坐姿尾巴摆动稍快，趴姿更慢更安静 */
+const TAIL_TICK_SIT_MS = 420;
+const TAIL_TICK_REST_MS = 900;
 
 export default function SubtitleOverlay({ lessonNo }: { lessonNo: number }) {
   const [cues, setCues] = useState<SubtitleCue[]>([]);
@@ -22,32 +34,139 @@ export default function SubtitleOverlay({ lessonNo }: { lessonNo: number }) {
   const [placeholder, setPlaceholder] = useState("等待播放同步");
   const [error, setError] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
+  const [catMode, setCatMode] = useState(true);
+  const [floatingSubtitles, setFloatingSubtitles] = useState(true);
+  const [playback, setPlayback] = useState<CatPlayback>("paused");
+  const [bubbleLeft, setBubbleLeft] = useState(false);
+  const [tailFrame, setTailFrame] = useState(0);
   const saveTimer = useRef<number | undefined>(undefined);
   const dragState = useRef({ x: 0, y: 0, didDrag: false, dragStarted: false });
+  const hitRefs = useRef<Array<HTMLElement | null>>([]);
+  const draggingRef = useRef(false);
+
+  const catView = resolveCatCompanionView({
+    playback,
+    floatingSubtitles,
+    hasCue: Boolean(currentText),
+  });
+  const showBubble = catView === "playing-speak";
+  const restPose = catView === "idle-rest";
 
   const focusPlayerWindow = useCallback(async () => {
     const player = await WebviewWindow.getByLabel("player").catch(() => null);
     if (!player) return;
     await player.show().catch(() => undefined);
     await player.setFocus().catch(() => undefined);
-  }, [lessonNo]);
+  }, []);
+
+  const updateBubbleSide = useCallback(async () => {
+    try {
+      const win = getCurrentWindow();
+      const [pos, size, monitor] = await Promise.all([
+        win.outerPosition(),
+        win.outerSize(),
+        currentMonitor(),
+      ]);
+      if (!monitor) return;
+      const midX = pos.x + size.width / 2;
+      const screenMid = monitor.position.x + monitor.size.width / 2;
+      setBubbleLeft(midX > screenMid);
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
+  /** 左右贴边时把窗口夹回屏幕内，避免气泡/猫被裁切 */
+  const clampWindowToMonitor = useCallback(async () => {
+    try {
+      const win = getCurrentWindow();
+      const [pos, size, monitor, factor] = await Promise.all([
+        win.outerPosition(),
+        win.outerSize(),
+        currentMonitor(),
+        win.scaleFactor(),
+      ]);
+      if (!monitor) return;
+      const margin = Math.round(10 * factor);
+      const minX = monitor.position.x + margin;
+      const minY = monitor.position.y + margin;
+      const maxX = monitor.position.x + monitor.size.width - size.width - margin;
+      const maxY = monitor.position.y + monitor.size.height - size.height - margin;
+      const nextX = Math.min(Math.max(pos.x, minX), Math.max(minX, maxX));
+      const nextY = Math.min(Math.max(pos.y, minY), Math.max(minY, maxY));
+      if (nextX !== pos.x || nextY !== pos.y) {
+        await win.setPosition(new PhysicalPosition(nextX, nextY));
+        saveSubtitlePosition({ x: nextX, y: nextY });
+      }
+      await updateBubbleSide();
+    } catch {
+      /* ignore */
+    }
+  }, [updateBubbleSide]);
 
   useEffect(() => {
     document.documentElement.classList.add("subtitle-view");
     return () => document.documentElement.classList.remove("subtitle-view");
   }, []);
 
+  useEffect(() => {
+    document.documentElement.classList.toggle("subtitle-cat-mode", catMode);
+    return () => document.documentElement.classList.remove("subtitle-cat-mode");
+  }, [catMode]);
+
+  // 预加载全部姿势/尾巴帧，切换时不闪白
+  useEffect(() => {
+    if (!catMode) return;
+    const images = [...CAT_SIT_FRAMES, ...CAT_REST_FRAMES].map((src) => {
+      const img = new Image();
+      img.src = src;
+      return img;
+    });
+    return () => {
+      images.length = 0;
+    };
+  }, [catMode]);
+
   async function closeSelf() {
     await getCurrentWindow().close().catch(() => undefined);
   }
+
+  useEffect(() => {
+    getSettings()
+      .then((s) => {
+        setCatMode(s.subtitleCatMode ?? true);
+        setFloatingSubtitles(s.floatingSubtitles ?? true);
+      })
+      .catch(() => undefined);
+
+    const unlistenCat = listen<boolean>("subtitle-cat-mode", (event) => {
+      setCatMode(event.payload);
+    });
+    const unlistenFloat = listen<boolean>("floating-subtitles", (event) => {
+      setFloatingSubtitles(event.payload);
+    });
+    return () => {
+      unlistenCat.then((fn) => fn());
+      unlistenFloat.then((fn) => fn());
+    };
+  }, []);
 
   useEffect(() => {
     let disposed = false;
 
     async function boot() {
       try {
-        const info = await resolveSubtitlePath(lessonNo);
+        const settings = await getSettings().catch(() => null);
+        const cat = settings?.subtitleCatMode ?? true;
+        const floating = settings?.floatingSubtitles ?? true;
+
+        const info = await resolveSubtitlePath(lessonNo).catch(() => null);
         if (!info) {
+          // 猫猫模式允许无字幕文件，只陪伴不说话
+          if (cat) {
+            setReady(true);
+            return;
+          }
           await closeSelf();
           return;
         }
@@ -55,13 +174,17 @@ export default function SubtitleOverlay({ lessonNo }: { lessonNo: number }) {
         const url = convertFileSrc(info.path);
         const res = await fetch(url);
         if (!res.ok) {
+          if (cat) {
+            setReady(true);
+            return;
+          }
           throw new Error(`无法读取字幕：${info.path}`);
         }
         const content = await res.text();
         if (disposed) return;
 
         const parsed = parseSubtitles(content, info.format);
-        if (parsed.length === 0) {
+        if (parsed.length === 0 && !cat) {
           await closeSelf();
           return;
         }
@@ -73,6 +196,11 @@ export default function SubtitleOverlay({ lessonNo }: { lessonNo: number }) {
           setPlaceholder(`此处暂无字幕（本文件约覆盖至 ${formatClock(lastEnd)}）`);
         } else {
           setPlaceholder("此处暂无字幕");
+        }
+
+        // 常规模式且关闭悬浮字幕时本不该开窗；防御性处理
+        if (!cat && !floating) {
+          await closeSelf();
         }
       } catch (e) {
         if (!disposed) {
@@ -98,42 +226,90 @@ export default function SubtitleOverlay({ lessonNo }: { lessonNo: number }) {
       win.center().catch(() => undefined);
     }
 
+    updateBubbleSide();
+    clampWindowToMonitor();
+
     const unlistenMove = win.onMoved(({ payload }) => {
       window.clearTimeout(saveTimer.current);
       saveTimer.current = window.setTimeout(() => {
         saveSubtitlePosition({ x: payload.x, y: payload.y });
-      }, 200);
+        if (draggingRef.current) {
+          updateBubbleSide();
+          return;
+        }
+        clampWindowToMonitor();
+      }, 140);
     });
 
     return () => {
       window.clearTimeout(saveTimer.current);
       unlistenMove.then((fn) => fn());
     };
-  }, []);
+  }, [updateBubbleSide, clampWindowToMonitor]);
 
   useEffect(() => {
     if (!ready) return;
 
-    const unlistenPromise = listen<{ lessonNo: number; currentTime: number }>(
-      "player-timeupdate",
+    const stickyTextRef = { current: "" };
+
+    const unlistenTime = listen<{
+      lessonNo: number;
+      currentTime: number;
+      playing?: boolean;
+    }>("player-timeupdate", (event) => {
+      if (event.payload.lessonNo !== lessonNo) return;
+
+      if (typeof event.payload.playing === "boolean") {
+        setPlayback(event.payload.playing ? "playing" : "paused");
+      }
+
+      const cue = cueAtTime(cues, event.payload.currentTime);
+      const upcoming = nextCue(cues, event.payload.currentTime);
+      const paused = event.payload.playing === false;
+
+      if (cue?.text) {
+        // 连续播放：句间不摘气泡，只换文案
+        stickyTextRef.current = cue.text;
+        setCurrentText(cue.text);
+        setNextText(upcoming && upcoming !== cue ? upcoming.text : "");
+        return;
+      }
+
+      if (paused) {
+        stickyTextRef.current = "";
+        setCurrentText("");
+        setNextText("");
+        setPlaceholder(
+          event.payload.currentTime > (cues[cues.length - 1]?.end ?? 0)
+            ? `此处暂无字幕（本文件约覆盖至 ${formatClock(cues[cues.length - 1]?.end ?? 0)}）`
+            : "等待播放同步",
+        );
+        return;
+      }
+
+      // 播放中空档：保持上一句，避免闪烁
+      if (stickyTextRef.current) {
+        setCurrentText(stickyTextRef.current);
+        setNextText(upcoming?.text ?? "");
+      }
+    });
+
+    const unlistenPlayback = listen<{ lessonNo: number; playing: boolean }>(
+      "player-playback",
       (event) => {
         if (event.payload.lessonNo !== lessonNo) return;
-        const cue = cueAtTime(cues, event.payload.currentTime);
-        const upcoming = nextCue(cues, event.payload.currentTime);
-        setCurrentText(cue?.text ?? "");
-        setNextText(upcoming && upcoming !== cue ? upcoming.text : "");
-        if (!cue?.text) {
-          setPlaceholder(
-            event.payload.currentTime > (cues[cues.length - 1]?.end ?? 0)
-              ? `此处暂无字幕（本文件约覆盖至 ${formatClock(cues[cues.length - 1]?.end ?? 0)}）`
-              : "等待播放同步",
-          );
+        setPlayback(event.payload.playing ? "playing" : "paused");
+        if (!event.payload.playing) {
+          stickyTextRef.current = "";
+          setCurrentText("");
+          setNextText("");
         }
       },
     );
 
     return () => {
-      unlistenPromise.then((unlisten) => unlisten());
+      unlistenTime.then((fn) => fn());
+      unlistenPlayback.then((fn) => fn());
     };
   }, [cues, lessonNo, ready]);
 
@@ -143,13 +319,81 @@ export default function SubtitleOverlay({ lessonNo }: { lessonNo: number }) {
         const win = getCurrentWindow();
         win.show().catch(() => undefined);
         win.setAlwaysOnTop(true).catch(() => undefined);
+        updateBubbleSide();
       }
     });
 
     return () => {
       unlistenPromise.then((unlisten) => unlisten());
     };
-  }, [lessonNo]);
+  }, [lessonNo, updateBubbleSide]);
+
+  useEffect(() => {
+    const win = getCurrentWindow();
+    if (!catMode) {
+      win.setIgnoreCursorEvents(false).catch(() => undefined);
+      return;
+    }
+
+    let cancelled = false;
+    let lastIgnore: boolean | null = null;
+    let pendingOver: boolean | null = null;
+    let pendingCount = 0;
+
+    async function syncHitTest() {
+      if (cancelled) return;
+      try {
+        const [cursor, pos, factor] = await Promise.all([
+          cursorPosition(),
+          win.outerPosition(),
+          win.scaleFactor(),
+        ]);
+        const localX = (cursor.x - pos.x) / factor;
+        const localY = (cursor.y - pos.y) / factor;
+        const overNow =
+          draggingRef.current ||
+          hitRefs.current.some((el) => {
+            if (!el) return false;
+            const r = el.getBoundingClientRect();
+            const pad = 4;
+            return (
+              localX >= r.left - pad &&
+              localX <= r.right + pad &&
+              localY >= r.top - pad &&
+              localY <= r.bottom + pad
+            );
+          });
+
+        if (pendingOver === overNow) {
+          pendingCount += 1;
+        } else {
+          pendingOver = overNow;
+          pendingCount = 1;
+        }
+        if (pendingCount < 2) {
+          if (!cancelled) window.setTimeout(syncHitTest, 48);
+          return;
+        }
+
+        const ignore = !overNow;
+        if (lastIgnore !== ignore) {
+          lastIgnore = ignore;
+          await win.setIgnoreCursorEvents(ignore);
+        }
+      } catch {
+        /* ignore */
+      }
+      if (!cancelled) {
+        window.setTimeout(syncHitTest, 64);
+      }
+    }
+
+    syncHitTest();
+    return () => {
+      cancelled = true;
+      win.setIgnoreCursorEvents(false).catch(() => undefined);
+    };
+  }, [catMode]);
 
   function onBarMouseDown(e: React.MouseEvent) {
     if (e.button !== 0) return;
@@ -167,16 +411,65 @@ export default function SubtitleOverlay({ lessonNo }: { lessonNo: number }) {
     if (Math.hypot(e.clientX - state.x, e.clientY - state.y) <= DRAG_THRESHOLD_PX) return;
     state.didDrag = true;
     state.dragStarted = true;
-    getCurrentWindow().startDragging().catch(() => undefined);
+    draggingRef.current = true;
+    getCurrentWindow()
+      .setIgnoreCursorEvents(false)
+      .catch(() => undefined)
+      .finally(() => {
+        getCurrentWindow().startDragging().catch(() => undefined);
+      });
   }
 
   function onBarMouseUp(e: React.MouseEvent) {
     if (e.button !== 0) return;
-    if (dragState.current.didDrag) return;
+    const didDrag = dragState.current.didDrag;
+    draggingRef.current = false;
+    if (didDrag) return;
     focusPlayerWindow().catch(() => undefined);
   }
 
-  if (error) {
+  useEffect(() => {
+    function endDrag() {
+      draggingRef.current = false;
+      clampWindowToMonitor();
+    }
+    window.addEventListener("mouseup", endDrag);
+    return () => window.removeEventListener("mouseup", endDrag);
+  }, [clampWindowToMonitor]);
+
+  const dragHandlers = {
+    title: "点击前置视频 · 拖动移动",
+    onMouseDown: onBarMouseDown,
+    onMouseMove: onBarMouseMove,
+    onMouseUp: onBarMouseUp,
+  };
+
+  function setHitRef(index: number) {
+    return (el: HTMLElement | null) => {
+      hitRefs.current[index] = el;
+    };
+  }
+
+  useEffect(() => {
+    if (!currentText) hitRefs.current[0] = null;
+  }, [currentText]);
+
+  // 尾巴轻摆：坐姿稍快，趴姿更慢更安静
+  useEffect(() => {
+    if (!catMode) return;
+    const ms = restPose ? TAIL_TICK_REST_MS : TAIL_TICK_SIT_MS;
+    const id = window.setInterval(() => {
+      setTailFrame((f) => (f + 1) % 12);
+    }, ms);
+    return () => window.clearInterval(id);
+  }, [catMode, restPose]);
+
+  useEffect(() => {
+    if (!catMode) return;
+    clampWindowToMonitor();
+  }, [catMode, showBubble, bubbleLeft, clampWindowToMonitor]);
+
+  if (error && !catMode) {
     return (
       <div className="subtitle-overlay-shell flex h-full w-full items-end justify-center p-2">
         <div className="subtitle-bar w-full max-w-2xl">
@@ -186,15 +479,52 @@ export default function SubtitleOverlay({ lessonNo }: { lessonNo: number }) {
     );
   }
 
+  if (catMode) {
+    return (
+      <div
+        className={`subtitle-overlay-shell subtitle-cat-shell flex h-full w-full items-end ${
+          bubbleLeft ? "justify-end" : "justify-start"
+        }`}
+      >
+        <div
+          className={`subtitle-cat-stack ${
+            bubbleLeft ? "subtitle-cat-stack--right" : "subtitle-cat-stack--left"
+          }`}
+        >
+          {showBubble && (
+            <div
+              ref={setHitRef(0)}
+              className="subtitle-bubble subtitle-bubble--visible cursor-grab select-none active:cursor-grabbing"
+              {...dragHandlers}
+            >
+              <p className="subtitle-current">{currentText}</p>
+              {nextText && <p className="subtitle-next">{nextText}</p>}
+            </div>
+          )}
+          <img
+            ref={setHitRef(1)}
+            className={`subtitle-cat-pet cursor-grab select-none active:cursor-grabbing ${
+              restPose ? "subtitle-cat-pet--rest" : "subtitle-cat-pet--talk"
+            }`}
+            src={
+              restPose
+                ? CAT_REST_FRAMES[tailFrame % CAT_REST_FRAMES.length]
+                : CAT_SIT_FRAMES[tailFrame % CAT_SIT_FRAMES.length]
+            }
+            alt=""
+            draggable={false}
+            width={restPose ? 96 : 70}
+            height={restPose ? 75 : 80}
+            {...dragHandlers}
+          />
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="subtitle-overlay-shell flex h-full w-full items-end justify-center p-2">
-      <div
-        className="subtitle-bar w-full max-w-2xl cursor-grab select-none active:cursor-grabbing"
-        title="点击前置视频 · 拖动移动"
-        onMouseDown={onBarMouseDown}
-        onMouseMove={onBarMouseMove}
-        onMouseUp={onBarMouseUp}
-      >
+      <div className="subtitle-bar w-full max-w-2xl cursor-grab select-none active:cursor-grabbing" {...dragHandlers}>
         {currentText ? (
           <p className="subtitle-current">{currentText}</p>
         ) : (

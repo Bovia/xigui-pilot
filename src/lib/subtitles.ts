@@ -124,3 +124,27 @@ export function nextCue(cues: SubtitleCue[], time: number): SubtitleCue | null {
   }
   return null;
 }
+
+export type CatPlayback = "none" | "paused" | "playing";
+
+/** 猫猫模式展示态（仅 catMode=true 时有意义） */
+export type CatCompanionView =
+  /** 无视频 / 暂停：休息姿势，无气泡 */
+  | "idle-rest"
+  /** 播放中 + 字幕关：坐姿安静猫，无气泡 */
+  | "playing-quiet"
+  /** 播放中 + 字幕开 + 当前无句：坐姿安静猫，无气泡（非待机） */
+  | "playing-gap"
+  /** 播放中 + 字幕开 + 当前有句：坐姿 + 气泡 */
+  | "playing-speak";
+
+export function resolveCatCompanionView(input: {
+  playback: CatPlayback;
+  floatingSubtitles: boolean;
+  hasCue: boolean;
+}): CatCompanionView {
+  if (input.playback !== "playing") return "idle-rest";
+  if (!input.floatingSubtitles) return "playing-quiet";
+  if (!input.hasCue) return "playing-gap";
+  return "playing-speak";
+}

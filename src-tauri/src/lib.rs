@@ -8,8 +8,8 @@ use std::sync::Mutex;
 
 use tauri::{
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
-    ActivationPolicy, AppHandle, Emitter, Manager, RunEvent, TitleBarStyle, WebviewUrl,
-    WebviewWindowBuilder,
+    ActivationPolicy, AppHandle, Emitter, LogicalSize, Manager, RunEvent, TitleBarStyle,
+    WebviewUrl, WebviewWindow, WebviewWindowBuilder,
 };
 use tauri_plugin_positioner::{on_tray_event, WindowExt};
 
@@ -92,6 +92,7 @@ pub fn run() {
             commands::set_woven_style,
             commands::set_plan_variant,
             commands::set_floating_subtitles,
+            commands::set_subtitle_cat_mode,
             commands::set_launch_at_login,
             commands::resolve_subtitle_path,
             commands::open_subtitle_window,
@@ -330,23 +331,63 @@ pub fn close_subtitle_window(app: &AppHandle, lesson_no: u32) {
     }
 }
 
+pub fn subtitle_window_size(cat_mode: bool) -> (f64, f64) {
+    if cat_mode {
+        (560.0, 220.0)
+    } else {
+        (640.0, 88.0)
+    }
+}
+
+pub fn apply_subtitle_window_layout(window: &WebviewWindow, cat_mode: bool) {
+    let (w, h) = subtitle_window_size(cat_mode);
+    let _ = window.set_size(LogicalSize::new(w, h));
+    let _ = window.set_min_size(Some(LogicalSize::new(
+        if cat_mode { 320.0 } else { 320.0 },
+        if cat_mode { 150.0 } else { 64.0 },
+    )));
+}
+
+pub fn refresh_subtitle_windows_for_mode(app: &AppHandle, cat_mode: bool) {
+    let windows: Vec<_> = app
+        .webview_windows()
+        .into_iter()
+        .filter(|(label, _)| label.starts_with("subtitle-"))
+        .map(|(_, window)| window)
+        .collect();
+    for window in windows {
+        apply_subtitle_window_layout(&window, cat_mode);
+        let _ = window.emit("subtitle-cat-mode", cat_mode);
+    }
+}
+
 pub fn ensure_subtitle_window(app: &AppHandle, lesson_no: u32) -> Result<(), String> {
     let label = format!("subtitle-{lesson_no}");
+    let cat_mode = settings::settings_path(app)
+        .map(|path| settings::Settings::load(&path).subtitle_cat_mode())
+        .unwrap_or(true);
 
     if let Some(window) = app.get_webview_window(&label) {
         let _ = window.show();
         let _ = window.set_always_on_top(true);
+        apply_subtitle_window_layout(&window, cat_mode);
         let _ = window.emit("subtitle-open", lesson_no);
+        let _ = window.emit("subtitle-cat-mode", cat_mode);
         return Ok(());
     }
 
+    let (w, h) = subtitle_window_size(cat_mode);
     let url = WebviewUrl::App(format!("index.html?view=subtitle&lesson={lesson_no}").into());
     WebviewWindowBuilder::new(app, &label, url)
         .title("字幕")
-        .inner_size(640.0, 88.0)
-        .min_inner_size(320.0, 64.0)
+        .inner_size(w, h)
+        .min_inner_size(
+            if cat_mode { 320.0 } else { 320.0 },
+            if cat_mode { 150.0 } else { 64.0 },
+        )
         .decorations(false)
         .transparent(true)
+        .shadow(false)
         .always_on_top(true)
         .resizable(false)
         .skip_taskbar(true)

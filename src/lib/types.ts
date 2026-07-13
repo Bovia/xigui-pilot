@@ -41,6 +41,7 @@ export interface Settings {
   wovenStyle?: boolean | null;
   planVariant?: string | null;
   floatingSubtitles?: boolean | null;
+  subtitleCatMode?: boolean | null;
   launchAtLogin?: boolean | null;
 }
 

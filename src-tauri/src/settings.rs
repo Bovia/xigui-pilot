@@ -21,6 +21,8 @@ pub struct Settings {
     #[serde(default)]
     pub floating_subtitles: Option<bool>,
     #[serde(default)]
+    pub subtitle_cat_mode: Option<bool>,
+    #[serde(default)]
     pub launch_at_login: Option<bool>,
 }
 
@@ -35,6 +37,7 @@ impl Default for Settings {
             woven_style: Some(false),
             plan_variant: Some("v2".into()),
             floating_subtitles: Some(true),
+            subtitle_cat_mode: Some(true),
             launch_at_login: Some(false),
         }
     }
@@ -51,6 +54,10 @@ impl Settings {
 
     pub fn floating_subtitles(&self) -> bool {
         self.floating_subtitles.unwrap_or(true)
+    }
+
+    pub fn subtitle_cat_mode(&self) -> bool {
+        self.subtitle_cat_mode.unwrap_or(true)
     }
 
     pub fn launch_at_login(&self) -> bool {
