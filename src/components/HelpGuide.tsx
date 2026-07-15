@@ -95,6 +95,10 @@ export default function HelpGuide({ open, quizName, onClose }: Props) {
               <code className="text-[11px]">[01]--导学.srt</code>。字幕条可拖到桌面任意位置。
               设置里可切换<strong>猫猫模式</strong>：像素奶牛猫常驻（开机自启后面板起来就会出现）。暂停/关视频时休息、不说话；播放中安静陪伴；只有开启悬浮字幕且当前有字幕句时才冒气泡。靠屏幕右侧时气泡会自动翻到左边。
             </p>
+            <p className="mt-1">
+              <strong>护眼</strong>（20-20-20）：播放时仍由播放器提醒，休息盖住播放窗口；没在播放时由猫走表，剩余约 5
+              分钟起显示状态条预告，到点用气泡催促。开始播 / 停播会换宿主并重新计时。
+            </p>
           </section>
 
           <section>

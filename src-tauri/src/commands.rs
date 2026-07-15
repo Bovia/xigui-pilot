@@ -1,8 +1,8 @@
 use crate::progress::{progress_path, PaceTodayLock, ProgressStore, VideoProgress};
 use crate::settings::{settings_path, Settings};
 use crate::{
-    activate_for_action, close_subtitle_window, ensure_cat_companion, ensure_player_window,
-    ensure_subtitle_window,
+    activate_for_action, close_eye_rest_window, close_subtitle_window, ensure_cat_companion,
+    ensure_eye_rest_window, ensure_player_window, ensure_subtitle_window,
     refresh_subtitle_windows_for_mode, restore_accessory, set_panel_hide_suppressed,
 };
 use chrono::{Local, NaiveDate};
@@ -994,6 +994,17 @@ pub fn open_subtitle_window(app: AppHandle, lesson_no: u32) -> Result<(), String
 #[tauri::command]
 pub fn close_subtitle_window_cmd(app: AppHandle, lesson_no: u32) -> Result<(), String> {
     close_subtitle_window(&app, lesson_no);
+    Ok(())
+}
+
+#[tauri::command]
+pub fn open_eye_rest_overlay(app: AppHandle) -> Result<(), String> {
+    ensure_eye_rest_window(&app)
+}
+
+#[tauri::command]
+pub fn close_eye_rest_overlay(app: AppHandle) -> Result<(), String> {
+    close_eye_rest_window(&app);
     Ok(())
 }
 

@@ -41,8 +41,7 @@ import {
 } from "../lib/studyStage";
 import type { CatalogLesson, PlanFile, TextbookFile, TodaySnapshot } from "../lib/types";
 import {
-  isEyeRestEnabled,
-  setEyeRestEnabled,
+  useEyeRestEnabled,
 } from "../lib/eyeRest";
 import { quizChapterKey, quizTooltip } from "../lib/quiz";
 import Tooltip from "../components/Tooltip";
@@ -509,7 +508,7 @@ export default function TodayPanel() {
   const [pickingTextbook, setPickingTextbook] = useState(false);
   const [pickingTricolorNotes, setPickingTricolorNotes] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
-  const [eyeRestOn, setEyeRestOn] = useState(isEyeRestEnabled);
+  const [eyeRestOn, setEyeRestOn] = useEyeRestEnabled();
   const [quizName, setQuizName] = useState("郑房新一点通");
   const [pinned, setPinned] = useState(true);
   const [wovenStyle, setWovenStyleOn] = useState(false);
@@ -1074,14 +1073,10 @@ export default function TodayPanel() {
                 </button>
                 <button
                   type="button"
-                  onClick={() => {
-                    const next = !eyeRestOn;
-                    setEyeRestOn(next);
-                    setEyeRestEnabled(next);
-                  }}
+                  onClick={() => setEyeRestOn(!eyeRestOn)}
                   className="w-full px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50"
                 >
-                  {eyeRestOn ? "✓ 护眼（看视频时）" : "护眼（看视频时）"}
+                  {eyeRestOn ? "✓ 护眼" : "护眼"}
                 </button>
                 <button
                   type="button"

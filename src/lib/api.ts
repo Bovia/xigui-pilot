@@ -259,6 +259,10 @@ export const setSubtitleCatMode = (enabled: boolean) =>
 export const setLaunchAtLogin = (enabled: boolean) =>
   invoke<Settings>("set_launch_at_login", { enabled });
 
+export const openEyeRestOverlay = () => invoke<void>("open_eye_rest_overlay");
+
+export const closeEyeRestOverlay = () => invoke<void>("close_eye_rest_overlay");
+
 export const openPlanSpreadsheet = (variant: PlanVariant) =>
   invoke<void>("open_plan_spreadsheet", { variant });
 

@@ -2,6 +2,7 @@ import {
   EYE_REST_BREAK_SEC,
   EYE_REST_SNOOZE_MIN,
   EYE_REST_WORK_MIN,
+  formatEyeRestDuration,
 } from "../lib/eyeRest";
 
 export default function EyeRestPrompt({
@@ -77,7 +78,7 @@ export default function EyeRestPrompt({
           dark ? "text-slate-300" : "text-slate-600"
         }`}
       >
-        20-20-20 法则：连续看屏 {EYE_REST_WORK_MIN} 分钟后，望向{" "}
+        20-20-20 法则：连续看屏 {formatEyeRestDuration(EYE_REST_WORK_MIN)}后，望向{" "}
         <strong>6 米外</strong>至少 {EYE_REST_BREAK_SEC} 秒，缓解视疲劳。
       </p>
       <div className="mt-2.5 flex gap-2">
@@ -101,7 +102,7 @@ export default function EyeRestPrompt({
               : "bg-white text-slate-600 ring-1 ring-slate-200 hover:bg-slate-50"
           }`}
         >
-          {EYE_REST_SNOOZE_MIN} 分钟后再提醒
+          {formatEyeRestDuration(EYE_REST_SNOOZE_MIN)}后再提醒
         </button>
         {onDismiss && (
           <button

@@ -1,5 +1,7 @@
 mod commands;
 #[cfg(target_os = "macos")]
+mod macos_overlay_spaces;
+#[cfg(target_os = "macos")]
 mod macos_traffic_lights;
 mod progress;
 mod settings;
@@ -23,6 +25,8 @@ pub struct AppState {
 pub const PLAYER_WINDOW_LABEL: &str = "player";
 /// 无播放器时的猫猫陪伴窗课节号（窗口身份用，可不挂字幕文件）
 pub const CAT_COMPANION_LESSON: u32 = 0;
+/// 护眼整屏黑底倒计时
+pub const EYE_REST_WINDOW_LABEL: &str = "eye-rest";
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -99,6 +103,8 @@ pub fn run() {
             commands::resolve_subtitle_path,
             commands::open_subtitle_window,
             commands::close_subtitle_window_cmd,
+            commands::open_eye_rest_overlay,
+            commands::close_eye_rest_overlay,
             commands::sync_pace_today_lock,
             commands::set_player_chrome_visible,
             commands::show_panel_window,
@@ -275,12 +281,13 @@ pub fn refresh_tray_badge(app: &AppHandle) {
 }
 
 fn show_panel(app: &AppHandle) {
+    // 先建猫窗（保持 Accessory），再切 Regular 聚焦面板，否则多桌面/全屏行为可能绑死在创建桌面
+    ensure_cat_companion(app);
     activate_for_action(app);
     if let Some(window) = app.get_webview_window("panel") {
         let _ = window.show();
         let _ = window.set_focus();
     }
-    ensure_cat_companion(app);
 }
 
 /// 通知猫猫窗：播放器已关闭 → 清气泡、idle-rest
@@ -314,6 +321,8 @@ pub fn ensure_cat_companion(app: &AppHandle) {
                 if lesson_no != CAT_COMPANION_LESSON {
                     let _ = window.show();
                     let _ = window.set_always_on_top(true);
+                    #[cfg(target_os = "macos")]
+                    macos_overlay_spaces::apply_overlay_space_behavior(&window);
                     return;
                 }
             }
@@ -435,6 +444,8 @@ pub fn ensure_subtitle_window(app: &AppHandle, lesson_no: u32) -> Result<(), Str
     if let Some(window) = app.get_webview_window(&label) {
         let _ = window.show();
         let _ = window.set_always_on_top(true);
+        #[cfg(target_os = "macos")]
+        macos_overlay_spaces::apply_overlay_space_behavior(&window);
         apply_subtitle_window_layout(&window, cat_mode);
         let _ = window.emit("subtitle-open", lesson_no);
         let _ = window.emit("subtitle-cat-mode", cat_mode);
@@ -456,10 +467,63 @@ pub fn ensure_subtitle_window(app: &AppHandle, lesson_no: u32) -> Result<(), Str
         .always_on_top(true)
         .resizable(false)
         .skip_taskbar(true)
+        .visible_on_all_workspaces(true)
         .build()
         .map_err(|e| e.to_string())?;
     let _ = window.show();
     let _ = window.set_always_on_top(true);
+    #[cfg(target_os = "macos")]
+    macos_overlay_spaces::apply_overlay_space_behavior(&window);
+
+    Ok(())
+}
+
+pub fn close_eye_rest_window(app: &AppHandle) {
+    if let Some(window) = app.get_webview_window(EYE_REST_WINDOW_LABEL) {
+        let _ = window.close();
+    }
+}
+
+/// 当前显示器整屏黑底（逻辑上盖住桌面，倒计时由前端绘制）
+pub fn ensure_eye_rest_window(app: &AppHandle) -> Result<(), String> {
+    if let Some(window) = app.get_webview_window(EYE_REST_WINDOW_LABEL) {
+        let _ = window.show();
+        let _ = window.set_always_on_top(true);
+        #[cfg(target_os = "macos")]
+        macos_overlay_spaces::apply_overlay_space_behavior(&window);
+        return Ok(());
+    }
+
+    let monitor = app
+        .primary_monitor()
+        .map_err(|e| e.to_string())?
+        .ok_or_else(|| "找不到显示器".to_string())?;
+    let scale = monitor.scale_factor();
+    let phys = monitor.size();
+    let pos = monitor.position();
+    let logical_w = phys.width as f64 / scale;
+    let logical_h = phys.height as f64 / scale;
+    let logical_x = pos.x as f64 / scale;
+    let logical_y = pos.y as f64 / scale;
+
+    let url = WebviewUrl::App("index.html?view=eye-rest".into());
+    let window = WebviewWindowBuilder::new(app, EYE_REST_WINDOW_LABEL, url)
+        .title("护眼休息")
+        .inner_size(logical_w, logical_h)
+        .position(logical_x, logical_y)
+        .decorations(false)
+        .transparent(false)
+        .shadow(false)
+        .always_on_top(true)
+        .resizable(false)
+        .skip_taskbar(true)
+        .visible_on_all_workspaces(true)
+        .build()
+        .map_err(|e| e.to_string())?;
+    let _ = window.show();
+    let _ = window.set_always_on_top(true);
+    #[cfg(target_os = "macos")]
+    macos_overlay_spaces::apply_overlay_space_behavior(&window);
 
     Ok(())
 }

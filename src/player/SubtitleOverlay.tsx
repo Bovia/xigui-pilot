@@ -10,6 +10,17 @@ import { WebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { getSettings, openPlayer, resolveSubtitlePath, showPanelWindow } from "../lib/api";
 import {
+  EYE_REST_BREAK_SEC,
+  EYE_REST_PREVIEW_SEC,
+  EYE_REST_SNOOZE_MIN,
+  EYE_REST_WORK_MIN,
+  formatEyeRestDuration,
+  formatEyeRestWorkLeft,
+  useEyeRestBlackout,
+  useEyeRestEnabled,
+  useEyeRestReminder,
+} from "../lib/eyeRest";
+import {
   cueAtTime,
   loadSubtitlePosition,
   nextCue,
@@ -77,6 +88,8 @@ export default function SubtitleOverlay({ lessonNo }: { lessonNo: number }) {
   const [playback, setPlayback] = useState<CatPlayback>("none");
   const [bubbleLeft, setBubbleLeft] = useState(false);
   const [tailFrame, setTailFrame] = useState(0);
+  const [eyeRestEnabled] = useEyeRestEnabled();
+  const [playerEyeBusy, setPlayerEyeBusy] = useState(false);
   const saveTimer = useRef<number | undefined>(undefined);
   const dragState = useRef({ x: 0, y: 0, didDrag: false, dragStarted: false });
   const hitRefs = useRef<Array<HTMLElement | null>>([]);
@@ -87,8 +100,41 @@ export default function SubtitleOverlay({ lessonNo }: { lessonNo: number }) {
     floatingSubtitles,
     hasCue: Boolean(currentText),
   });
-  const showBubble = catView === "playing-speak";
-  const restPose = catView === "idle-rest";
+  // 不播才由猫走护眼；播时归播放器。播放器催促/休息中也让出，避免 pause 后双开。
+  const eyeRestActive = catMode && playback !== "playing" && !playerEyeBusy;
+  const {
+    phase: eyePhase,
+    restLeft: eyeRestLeft,
+    workLeftSec,
+    startRest: startEyeRest,
+    snooze: snoozeEyeRest,
+    reset: resetEyeRest,
+  } = useEyeRestReminder(eyeRestActive, eyeRestEnabled);
+  useEyeRestBlackout(eyePhase, eyeRestLeft);
+
+  useEffect(() => {
+    if (playback === "playing" || playerEyeBusy) resetEyeRest();
+  }, [playback, playerEyeBusy, resetEyeRest]);
+
+  useEffect(() => {
+    const unlisten = listen<{ phase: string }>("player-eye-rest", (event) => {
+      setPlayerEyeBusy(event.payload.phase !== "idle");
+    });
+    return () => {
+      unlisten.then((fn) => fn());
+    };
+  }, []);
+
+  const showSubtitleBubble = catView === "playing-speak";
+  const showEyeBubble = eyeRestActive && eyeRestEnabled && eyePhase === "prompt";
+  const showEyePreview =
+    eyeRestActive &&
+    eyeRestEnabled &&
+    eyePhase === "idle" &&
+    workLeftSec !== null &&
+    workLeftSec <= EYE_REST_PREVIEW_SEC;
+  const showBubble = showEyeBubble || showSubtitleBubble;
+  const restPose = catView === "idle-rest" || eyePhase === "resting";
 
   const focusPlayerWindow = useCallback(async () => {
     const player = await WebviewWindow.getByLabel("player").catch(() => null);
@@ -578,7 +624,7 @@ export default function SubtitleOverlay({ lessonNo }: { lessonNo: number }) {
   useEffect(() => {
     if (!catMode) return;
     clampWindowToMonitor();
-  }, [catMode, showBubble, bubbleLeft, clampWindowToMonitor]);
+  }, [catMode, showBubble, showEyePreview, bubbleLeft, clampWindowToMonitor]);
 
   if (error && !catMode) {
     return (
@@ -602,7 +648,35 @@ export default function SubtitleOverlay({ lessonNo }: { lessonNo: number }) {
             bubbleLeft ? "subtitle-cat-stack--right" : "subtitle-cat-stack--left"
           }`}
         >
-          {showBubble && (
+          {showEyeBubble && (
+            <div
+              ref={setHitRef(0)}
+              className="subtitle-bubble subtitle-bubble--visible subtitle-bubble--eye select-none"
+            >
+              <p className="subtitle-current">该歇眼啦</p>
+              <p className="subtitle-next">
+                盯屏约 {formatEyeRestDuration(EYE_REST_WORK_MIN)}了，望向{" "}
+                <strong>6 米外</strong> 眨眨眼～
+              </p>
+              <div className="subtitle-eye-actions">
+                <button
+                  type="button"
+                  className="subtitle-eye-btn subtitle-eye-btn--primary"
+                  onClick={startEyeRest}
+                >
+                  开始 {EYE_REST_BREAK_SEC} 秒休息
+                </button>
+                <button
+                  type="button"
+                  className="subtitle-eye-btn"
+                  onClick={snoozeEyeRest}
+                >
+                  {formatEyeRestDuration(EYE_REST_SNOOZE_MIN)}后再说
+                </button>
+              </div>
+            </div>
+          )}
+          {!showEyeBubble && showSubtitleBubble && (
             <div
               ref={setHitRef(0)}
               className="subtitle-bubble subtitle-bubble--visible cursor-grab select-none active:cursor-grabbing"
@@ -610,6 +684,11 @@ export default function SubtitleOverlay({ lessonNo }: { lessonNo: number }) {
             >
               <p className="subtitle-current">{currentText}</p>
               {nextText && <p className="subtitle-next">{nextText}</p>}
+            </div>
+          )}
+          {showEyePreview && workLeftSec !== null && (
+            <div className="subtitle-eye-chip" aria-live="polite">
+              {formatEyeRestWorkLeft(workLeftSec)}
             </div>
           )}
           <img

@@ -19,7 +19,7 @@ import {
   setPlayerPinned,
 } from "../lib/api";
 import { catalogLessonList } from "../lib/pacePlan";
-import { isEyeRestEnabled, useEyeRestReminder } from "../lib/eyeRest";
+import { useEyeRestBlackout, useEyeRestEnabled, useEyeRestReminder } from "../lib/eyeRest";
 import { bindPlayerWindowAspect } from "../lib/playerWindow";
 import type { PlanFile, PlanLesson } from "../lib/types";
 
@@ -206,11 +206,22 @@ export default function VideoPlayer({ lessonNo }: { lessonNo: number }) {
   const pinnedRef = useRef(true);
   const chromeHideTimerRef = useRef<number | undefined>(undefined);
   const [chromeVisible, setChromeVisible] = useState(false);
-  const [eyeRestEnabled] = useState(isEyeRestEnabled);
+  const [eyeRestEnabled] = useEyeRestEnabled();
+  // 仅播放中走表；到点 pause 后仍靠 phase 保留卡片/窗内休眠，勿因 playing=false 清掉
   const { phase, restLeft, startRest, snooze, dismissPrompt } = useEyeRestReminder(
     playing,
     eyeRestEnabled,
   );
+  useEyeRestBlackout(phase, restLeft);
+
+  // 告知猫窗：播放器正在催促/休息时，猫不要并行走表
+  useEffect(() => {
+    const busyPhase = eyeRestEnabled && phase !== "idle" ? phase : "idle";
+    emit("player-eye-rest", { phase: busyPhase }).catch(() => undefined);
+    return () => {
+      emit("player-eye-rest", { phase: "idle" }).catch(() => undefined);
+    };
+  }, [phase, eyeRestEnabled]);
 
   useEffect(() => {
     document.documentElement.classList.add("player-view");
@@ -709,7 +720,7 @@ export default function VideoPlayer({ lessonNo }: { lessonNo: number }) {
           </p>
         </div>
       )}
-      {eyeRestEnabled && phase !== "idle" && (
+      {eyeRestEnabled && phase === "prompt" && (
         <EyeRestPrompt
           phase={phase}
           restLeft={restLeft}

@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { listen } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import TodayPanel from "./panel/TodayPanel";
+import EyeRestOverlay from "./player/EyeRestOverlay";
 import SubtitleOverlay from "./player/SubtitleOverlay";
 import VideoPlayer from "./player/VideoPlayer";
 
@@ -44,9 +45,17 @@ export default function App() {
       win.setTitleBarStyle("overlay").catch(() => undefined);
       return;
     }
+    if (view === "eye-rest") {
+      win.setDecorations(false).catch(() => undefined);
+      return;
+    }
     win.setTitleBarStyle("visible").catch(() => undefined);
     win.setDecorations(view !== "panel" && view !== "subtitle").catch(() => undefined);
   }, [view]);
+
+  if (view === "eye-rest") {
+    return <EyeRestOverlay />;
+  }
 
   if (view === "subtitle" && lessonNo !== undefined) {
     return <SubtitleOverlay lessonNo={lessonNo} />;
