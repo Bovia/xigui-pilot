@@ -100,21 +100,14 @@ export default function SubtitleOverlay({ lessonNo }: { lessonNo: number }) {
     floatingSubtitles,
     hasCue: Boolean(currentText),
   });
-  // 不播才由猫走护眼；播时归播放器。播放器催促/休息中也让出，避免 pause 后双开。
-  const eyeRestActive = catMode && playback !== "playing" && !playerEyeBusy;
+  // 全局工时；UI：播时不抢字幕，播放器催促中不叠气泡
   const {
     phase: eyePhase,
     restLeft: eyeRestLeft,
     workLeftSec,
     startRest: startEyeRest,
     snooze: snoozeEyeRest,
-    reset: resetEyeRest,
-  } = useEyeRestReminder(eyeRestActive, eyeRestEnabled);
-  useEyeRestBlackout(eyePhase, eyeRestLeft);
-
-  useEffect(() => {
-    if (playback === "playing" || playerEyeBusy) resetEyeRest();
-  }, [playback, playerEyeBusy, resetEyeRest]);
+  } = useEyeRestReminder(eyeRestEnabled);
 
   useEffect(() => {
     const unlisten = listen<{ phase: string }>("player-eye-rest", (event) => {
@@ -125,12 +118,23 @@ export default function SubtitleOverlay({ lessonNo }: { lessonNo: number }) {
     };
   }, []);
 
+  // 无播放器时才由猫拉全屏黑底；播放器在时休息倒计时画在播放器内
+  const catOwnsBlackout = playback === "none" && !playerEyeBusy;
+  useEyeRestBlackout(catOwnsBlackout && eyePhase === "resting" ? "resting" : "idle", eyeRestLeft);
+
   const showSubtitleBubble = catView === "playing-speak";
-  const showEyeBubble = eyeRestActive && eyeRestEnabled && eyePhase === "prompt";
+  const showEyeBubble =
+    catMode &&
+    eyeRestEnabled &&
+    eyePhase === "prompt" &&
+    playback !== "playing" &&
+    !playerEyeBusy;
   const showEyePreview =
-    eyeRestActive &&
+    catMode &&
     eyeRestEnabled &&
     eyePhase === "idle" &&
+    playback !== "playing" &&
+    !playerEyeBusy &&
     workLeftSec !== null &&
     workLeftSec <= EYE_REST_PREVIEW_SEC;
   const showBubble = showEyeBubble || showSubtitleBubble;

@@ -19,7 +19,7 @@ import {
   setPlayerPinned,
 } from "../lib/api";
 import { catalogLessonList } from "../lib/pacePlan";
-import { useEyeRestBlackout, useEyeRestEnabled, useEyeRestReminder } from "../lib/eyeRest";
+import { useEyeRestEnabled, useEyeRestReminder } from "../lib/eyeRest";
 import { bindPlayerWindowAspect } from "../lib/playerWindow";
 import type { PlanFile, PlanLesson } from "../lib/types";
 
@@ -201,20 +201,16 @@ export default function VideoPlayer({ lessonNo }: { lessonNo: number }) {
   const [error, setError] = useState<string | null>(null);
   const [subtitleHint, setSubtitleHint] = useState<string | null>(null);
   const [lessonTitle, setLessonTitle] = useState(`第 ${lessonNo} 节`);
-  const [playing, setPlaying] = useState(false);
   const [pinned, setPinned] = useState(true);
   const pinnedRef = useRef(true);
   const chromeHideTimerRef = useRef<number | undefined>(undefined);
   const [chromeVisible, setChromeVisible] = useState(false);
   const [eyeRestEnabled] = useEyeRestEnabled();
-  // 仅播放中走表；到点 pause 后仍靠 phase 保留卡片/窗内休眠，勿因 playing=false 清掉
-  const { phase, restLeft, startRest, snooze, dismissPrompt } = useEyeRestReminder(
-    playing,
-    eyeRestEnabled,
-  );
-  useEyeRestBlackout(phase, restLeft);
+  // 全局一条工时线；播↔不播不重置。到点 pause 后仍靠 phase 保留卡片。
+  const { phase, restLeft, startRest, snooze, dismissPrompt } = useEyeRestReminder(eyeRestEnabled);
+  // 播放中休息：倒计时画在播放器内，不拉全屏黑底（避免与猫窗抢开关导致闪一下就没）
 
-  // 告知猫窗：播放器正在催促/休息时，猫不要并行走表
+  // 告知猫窗：播放器正在催促/休息时，猫气泡别叠一层（时间线仍共用）
   useEffect(() => {
     const busyPhase = eyeRestEnabled && phase !== "idle" ? phase : "idle";
     emit("player-eye-rest", { phase: busyPhase }).catch(() => undefined);
@@ -534,7 +530,6 @@ export default function VideoPlayer({ lessonNo }: { lessonNo: number }) {
 
         artRef.current.on("play", () => {
           if (!activeLesson()) return;
-          setPlaying(true);
           pushTimeUpdate();
           emit("player-playback", { lessonNo: bootLessonNo, playing: true }).catch(
             () => undefined,
@@ -542,7 +537,6 @@ export default function VideoPlayer({ lessonNo }: { lessonNo: number }) {
         });
         artRef.current.on("pause", () => {
           if (!activeLesson()) return;
-          setPlaying(false);
           emit("player-playback", { lessonNo: bootLessonNo, playing: false }).catch(
             () => undefined,
           );
@@ -550,7 +544,6 @@ export default function VideoPlayer({ lessonNo }: { lessonNo: number }) {
         });
         artRef.current.on("video:ended", () => {
           if (!activeLesson()) return;
-          setPlaying(false);
           emit("player-playback", { lessonNo: bootLessonNo, playing: false }).catch(
             () => undefined,
           );
@@ -633,7 +626,6 @@ export default function VideoPlayer({ lessonNo }: { lessonNo: number }) {
   useEffect(() => {
     if (phase !== "prompt" || !artRef.current) return;
     artRef.current.pause();
-    setPlaying(false);
   }, [phase]);
 
   return (
@@ -720,7 +712,7 @@ export default function VideoPlayer({ lessonNo }: { lessonNo: number }) {
           </p>
         </div>
       )}
-      {eyeRestEnabled && phase === "prompt" && (
+      {eyeRestEnabled && (phase === "prompt" || phase === "resting") && (
         <EyeRestPrompt
           phase={phase}
           restLeft={restLeft}

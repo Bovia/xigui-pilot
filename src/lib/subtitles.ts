@@ -146,8 +146,8 @@ export type CatPlayback = "none" | "paused" | "playing";
  * 开机自启 → 面板 Ready 后拉猫窗，初始 idle-rest。
  *
  * 护眼（另层，与上表正交）：
- * - 播放中 → 播放器宿主（卡片 + 窗内休眠），猫只管字幕
- * - 非播放 → 猫宿主（状态条预告 + 气泡催促）；切换从 0 重计
+ * - 全局一条工时线（localStorage 截止时刻），播↔不播切换不重置
+ * - 催促 UI：播放中归播放器卡片；不播归猫气泡；休息共用整屏黑底
  */
 export type CatCompanionView =
   | "idle-rest"

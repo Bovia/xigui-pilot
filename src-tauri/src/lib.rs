@@ -25,8 +25,8 @@ pub struct AppState {
 pub const PLAYER_WINDOW_LABEL: &str = "player";
 /// 无播放器时的猫猫陪伴窗课节号（窗口身份用，可不挂字幕文件）
 pub const CAT_COMPANION_LESSON: u32 = 0;
-/// 护眼整屏黑底倒计时
-pub const EYE_REST_WINDOW_LABEL: &str = "eye-rest";
+/// 护眼整屏黑底倒计时（每块显示器一个：eye-rest-0 / eye-rest-1 …）
+pub const EYE_REST_WINDOW_PREFIX: &str = "eye-rest-";
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -281,13 +281,24 @@ pub fn refresh_tray_badge(app: &AppHandle) {
 }
 
 fn show_panel(app: &AppHandle) {
+    // 托盘点击后 macOS 常立刻再丢一次焦点；短抑制，避免「闪一下就没」
+    set_panel_hide_suppressed(app, true);
     // 先建猫窗（保持 Accessory），再切 Regular 聚焦面板，否则多桌面/全屏行为可能绑死在创建桌面
     ensure_cat_companion(app);
     activate_for_action(app);
     if let Some(window) = app.get_webview_window("panel") {
+        let _ = window.unminimize();
         let _ = window.show();
         let _ = window.set_focus();
     }
+    let handle = app.clone();
+    std::thread::spawn(move || {
+        std::thread::sleep(std::time::Duration::from_millis(450));
+        if let Some(window) = handle.get_webview_window("panel") {
+            let _ = window.set_focus();
+        }
+        set_panel_hide_suppressed(&handle, false);
+    });
 }
 
 /// 通知猫猫窗：播放器已关闭 → 清气泡、idle-rest
@@ -337,7 +348,10 @@ fn toggle_panel(app: &AppHandle) {
         return;
     };
 
-    if window.is_visible().unwrap_or(false) {
+    let visible = window.is_visible().unwrap_or(false);
+    let focused = window.is_focused().unwrap_or(false);
+    // 已在最前再点托盘才收起；可见但没焦点时改成拉到前面（避免「闪一下又没」）
+    if visible && focused {
         let _ = window.hide();
         restore_accessory(app);
         return;
@@ -479,25 +493,29 @@ pub fn ensure_subtitle_window(app: &AppHandle, lesson_no: u32) -> Result<(), Str
 }
 
 pub fn close_eye_rest_window(app: &AppHandle) {
-    if let Some(window) = app.get_webview_window(EYE_REST_WINDOW_LABEL) {
-        let _ = window.close();
+    let labels: Vec<String> = app
+        .webview_windows()
+        .keys()
+        .filter(|label| label.starts_with(EYE_REST_WINDOW_PREFIX))
+        .cloned()
+        .collect();
+    for label in labels {
+        if let Some(window) = app.get_webview_window(&label) {
+            let _ = window.close();
+        }
     }
 }
 
-/// 当前显示器整屏黑底（逻辑上盖住桌面，倒计时由前端绘制）
-pub fn ensure_eye_rest_window(app: &AppHandle) -> Result<(), String> {
-    if let Some(window) = app.get_webview_window(EYE_REST_WINDOW_LABEL) {
-        let _ = window.show();
-        let _ = window.set_always_on_top(true);
-        #[cfg(target_os = "macos")]
-        macos_overlay_spaces::apply_overlay_space_behavior(&window);
-        return Ok(());
+fn build_eye_rest_window_on_monitor(
+    app: &AppHandle,
+    label: &str,
+    monitor: &tauri::Monitor,
+    show_countdown: bool,
+) -> Result<(), String> {
+    if let Some(window) = app.get_webview_window(label) {
+        let _ = window.destroy();
     }
 
-    let monitor = app
-        .primary_monitor()
-        .map_err(|e| e.to_string())?
-        .ok_or_else(|| "找不到显示器".to_string())?;
     let scale = monitor.scale_factor();
     let phys = monitor.size();
     let pos = monitor.position();
@@ -506,8 +524,14 @@ pub fn ensure_eye_rest_window(app: &AppHandle) -> Result<(), String> {
     let logical_x = pos.x as f64 / scale;
     let logical_y = pos.y as f64 / scale;
 
-    let url = WebviewUrl::App("index.html?view=eye-rest".into());
-    let window = WebviewWindowBuilder::new(app, EYE_REST_WINDOW_LABEL, url)
+    let url = WebviewUrl::App(
+        format!(
+            "index.html?view=eye-rest{}",
+            if show_countdown { "&countdown=1" } else { "" }
+        )
+        .into(),
+    );
+    let window = WebviewWindowBuilder::new(app, label, url)
         .title("护眼休息")
         .inner_size(logical_w, logical_h)
         .position(logical_x, logical_y)
@@ -524,6 +548,64 @@ pub fn ensure_eye_rest_window(app: &AppHandle) -> Result<(), String> {
     let _ = window.set_always_on_top(true);
     #[cfg(target_os = "macos")]
     macos_overlay_spaces::apply_overlay_space_behavior(&window);
+    Ok(())
+}
 
+fn monitor_contains_point(monitor: &tauri::Monitor, x: f64, y: f64) -> bool {
+    let pos = monitor.position();
+    let size = monitor.size();
+    let left = pos.x as f64;
+    let top = pos.y as f64;
+    let right = left + size.width as f64;
+    let bottom = top + size.height as f64;
+    x >= left && x < right && y >= top && y < bottom
+}
+
+/// 每块显示器各盖一层整屏黑底；倒计时只出现在鼠标所在屏（找不到则主屏）
+pub fn ensure_eye_rest_window(app: &AppHandle) -> Result<(), String> {
+    let monitors = app.available_monitors().map_err(|e| e.to_string())?;
+    let cursor = app.cursor_position().ok();
+    let primary = app.primary_monitor().ok().flatten();
+
+    let mut countdown_index: Option<usize> = None;
+    if let Some(pos) = cursor {
+        for (index, monitor) in monitors.iter().enumerate() {
+            if monitor_contains_point(monitor, pos.x, pos.y) {
+                countdown_index = Some(index);
+                break;
+            }
+        }
+    }
+    if countdown_index.is_none() {
+        if let (Some(primary), true) = (primary.as_ref(), !monitors.is_empty()) {
+            countdown_index = monitors.iter().position(|m| {
+                m.position() == primary.position() && m.size() == primary.size()
+            });
+        }
+        if countdown_index.is_none() {
+            countdown_index = Some(0);
+        }
+    }
+
+    if monitors.is_empty() {
+        let Some(monitor) = primary else {
+            return Err("找不到显示器".to_string());
+        };
+        return build_eye_rest_window_on_monitor(
+            app,
+            &format!("{EYE_REST_WINDOW_PREFIX}0"),
+            &monitor,
+            true,
+        );
+    }
+
+    // 已有窗可能是旧会话「全是倒计时」：先关掉再建，保证只有当前屏带 countdown
+    close_eye_rest_window(app);
+
+    for (index, monitor) in monitors.iter().enumerate() {
+        let label = format!("{EYE_REST_WINDOW_PREFIX}{index}");
+        let show_countdown = countdown_index == Some(index);
+        build_eye_rest_window_on_monitor(app, &label, monitor, show_countdown)?;
+    }
     Ok(())
 }

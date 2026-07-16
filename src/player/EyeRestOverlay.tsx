@@ -1,10 +1,16 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { listen } from "@tauri-apps/api/event";
 import { EYE_REST_BREAK_SEC } from "../lib/eyeRest";
 
-/** 整屏黑底休息：大号倒计时居中 */
+function readShowCountdown() {
+  return new URLSearchParams(window.location.search).get("countdown") === "1";
+}
+
+/** 整屏黑底休息：当前屏显示倒计时，其它屏纯黑 */
 export default function EyeRestOverlay() {
+  const showCountdown = readShowCountdown();
   const [restLeft, setRestLeft] = useState(EYE_REST_BREAK_SEC);
+  const syncedRef = useRef(false);
 
   useEffect(() => {
     document.documentElement.classList.add("eye-rest-view");
@@ -12,15 +18,39 @@ export default function EyeRestOverlay() {
   }, []);
 
   useEffect(() => {
-    const unlistenOpen = listen<{ restLeft: number }>("eye-rest-tick", (event) => {
-      if (typeof event.payload.restLeft === "number") {
-        setRestLeft(event.payload.restLeft);
-      }
+    if (!showCountdown) return;
+    const unlisten = listen<{ restLeft: number }>("eye-rest-tick", (event) => {
+      if (typeof event.payload.restLeft !== "number") return;
+      syncedRef.current = true;
+      setRestLeft(event.payload.restLeft);
     });
     return () => {
-      unlistenOpen.then((fn) => fn());
+      unlisten.then((fn) => fn());
     };
-  }, []);
+  }, [showCountdown]);
+
+  useEffect(() => {
+    if (!showCountdown) return;
+    const id = window.setInterval(() => {
+      setRestLeft((prev) => (prev <= 1 ? 0 : prev - 1));
+    }, 1000);
+    return () => window.clearInterval(id);
+  }, [showCountdown]);
+
+  useEffect(() => {
+    if (!showCountdown) return;
+    const id = window.setTimeout(() => {
+      if (syncedRef.current) return;
+      import("@tauri-apps/api/event")
+        .then(({ emit }) => emit("eye-rest-request-sync"))
+        .catch(() => undefined);
+    }, 400);
+    return () => window.clearTimeout(id);
+  }, [showCountdown]);
+
+  if (!showCountdown) {
+    return <div className="eye-rest-blackout" aria-hidden />;
+  }
 
   return (
     <div className="eye-rest-blackout">

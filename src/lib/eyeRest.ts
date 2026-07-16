@@ -1,43 +1,80 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { closeEyeRestOverlay, openEyeRestOverlay } from "./api";
 
-/** 20-20-20：每 20 分钟看 6 米外 20 秒（美国眼科学会等机构推荐）
- *  调试期用短间隔；验收完改回 WORK=20 / BREAK=20 / SNOOZE=5 / PREVIEW=5*60 */
-export const EYE_REST_WORK_MIN = 0.5; // 调试：30 秒（正式 20）
-export const EYE_REST_BREAK_SEC = 8; // 调试：8 秒（正式 20）
-export const EYE_REST_SNOOZE_MIN = 0.25; // 调试：15 秒（正式 5）
+/** 20-20-20：每 20 分钟看 6 米外 20 秒（美国眼科学会等机构推荐） */
+export const EYE_REST_WORK_MIN = 20;
+export const EYE_REST_BREAK_SEC = 20;
+export const EYE_REST_SNOOZE_MIN = 5;
 /** 剩余工时少于此秒数时，宿主可显示预告（猫状态条等） */
-export const EYE_REST_PREVIEW_SEC = 20; // 调试：最后 20 秒出预告（正式 5*60）
+export const EYE_REST_PREVIEW_SEC = 5 * 60;
 
-const STORAGE_KEY = "xigui-eye-rest-enabled";
-const CHANGED_EVENT = "xigui-eye-rest-changed";
+const ENABLED_KEY = "xigui-eye-rest-enabled";
+const STATE_KEY = "xigui-eye-rest-state";
+const ENABLED_EVENT = "xigui-eye-rest-changed";
+const STATE_EVENT = "xigui-eye-rest-state";
 
 export type EyeRestPhase = "idle" | "prompt" | "resting";
 
+type PersistedEyeRest = {
+  phase: EyeRestPhase;
+  /** idle 走表截止时刻；null 表示尚未开跑 */
+  workDeadline: number | null;
+  snoozeUntil: number;
+  /** resting 结束时刻 */
+  restEndsAt: number | null;
+};
+
+const DEFAULT_STATE: PersistedEyeRest = {
+  phase: "idle",
+  workDeadline: null,
+  snoozeUntil: 0,
+  restEndsAt: null,
+};
+
 export function isEyeRestEnabled(): boolean {
-  return localStorage.getItem(STORAGE_KEY) !== "false";
+  return localStorage.getItem(ENABLED_KEY) !== "false";
 }
 
 export function setEyeRestEnabled(enabled: boolean) {
-  localStorage.setItem(STORAGE_KEY, enabled ? "true" : "false");
-  window.dispatchEvent(new CustomEvent(CHANGED_EVENT, { detail: enabled }));
+  localStorage.setItem(ENABLED_KEY, enabled ? "true" : "false");
+  window.dispatchEvent(new CustomEvent(ENABLED_EVENT, { detail: enabled }));
 }
 
-/** 跨面板/播放器/猫窗同步护眼开关（同 origin 的 storage + 本窗 CustomEvent） */
+function readPersisted(): PersistedEyeRest {
+  try {
+    const raw = localStorage.getItem(STATE_KEY);
+    if (!raw) return { ...DEFAULT_STATE };
+    const parsed = JSON.parse(raw) as Partial<PersistedEyeRest>;
+    return {
+      phase: parsed.phase === "prompt" || parsed.phase === "resting" ? parsed.phase : "idle",
+      workDeadline: typeof parsed.workDeadline === "number" ? parsed.workDeadline : null,
+      snoozeUntil: typeof parsed.snoozeUntil === "number" ? parsed.snoozeUntil : 0,
+      restEndsAt: typeof parsed.restEndsAt === "number" ? parsed.restEndsAt : null,
+    };
+  } catch {
+    return { ...DEFAULT_STATE };
+  }
+}
+
+function writePersisted(state: PersistedEyeRest) {
+  localStorage.setItem(STATE_KEY, JSON.stringify(state));
+  window.dispatchEvent(new CustomEvent(STATE_EVENT));
+}
+
+/** 跨面板/播放器/猫窗同步护眼开关 */
 export function useEyeRestEnabled(): [boolean, (enabled: boolean) => void] {
   const [enabled, setEnabled] = useState(isEyeRestEnabled);
 
   useEffect(() => {
     const sync = () => setEnabled(isEyeRestEnabled());
     const onStorage = (e: StorageEvent) => {
-      if (e.key === STORAGE_KEY) sync();
+      if (e.key === ENABLED_KEY) sync();
     };
-    const onLocal = () => sync();
     window.addEventListener("storage", onStorage);
-    window.addEventListener(CHANGED_EVENT, onLocal);
+    window.addEventListener(ENABLED_EVENT, sync);
     return () => {
       window.removeEventListener("storage", onStorage);
-      window.removeEventListener(CHANGED_EVENT, onLocal);
+      window.removeEventListener(ENABLED_EVENT, sync);
     };
   }, []);
 
@@ -61,7 +98,7 @@ export function formatEyeRestWorkLeft(sec: number): string {
   return `歇眼 ${sec}″`;
 }
 
-/** 把「分钟」常数格式化成可读时长（调试短间隔也会显示成秒） */
+/** 把「分钟」常数格式化成可读时长 */
 export function formatEyeRestDuration(min: number): string {
   const sec = Math.round(min * 60);
   if (sec < 60) return `${sec} 秒`;
@@ -70,167 +107,224 @@ export function formatEyeRestDuration(min: number): string {
 }
 
 /**
- * 休息中：拉开/同步整屏黑底倒计时窗；结束或卸载时关掉。
- * 催促 UI 仍由各宿主自己管，只有 resting 才上黑屏。
- * 仅当本宿主曾进入 resting 时才关窗，避免播放器休息时猫侧 idle 误关黑屏。
+ * 休息中：拉开/同步整屏黑底倒计时窗。
+ * 卸载时不关黑屏（另一宿主可能仍在 resting），只在 phase 离开 resting 时关。
  */
 export function useEyeRestBlackout(phase: EyeRestPhase, restLeft: number) {
-  const ownsOverlay = useRef(false);
+  const restLeftRef = useRef(restLeft);
+  restLeftRef.current = restLeft;
 
   useEffect(() => {
     let cancelled = false;
-    async function sync() {
+    async function syncOpen() {
       if (phase === "resting") {
-        ownsOverlay.current = true;
         await openEyeRestOverlay().catch(() => undefined);
         if (cancelled) return;
-        const { emit, emitTo } = await import("@tauri-apps/api/event");
-        const payload = { restLeft };
-        await emit("eye-rest-tick", payload).catch(() => undefined);
-        await emitTo("eye-rest", "eye-rest-tick", payload).catch(() => undefined);
+        const { emit } = await import("@tauri-apps/api/event");
+        await emit("eye-rest-tick", { restLeft: restLeftRef.current }).catch(() => undefined);
         return;
       }
-      if (ownsOverlay.current) {
-        ownsOverlay.current = false;
-        await closeEyeRestOverlay().catch(() => undefined);
-      }
+      await closeEyeRestOverlay().catch(() => undefined);
     }
-    sync();
+    syncOpen();
+    return () => {
+      cancelled = true;
+    };
+  }, [phase]);
+
+  useEffect(() => {
+    if (phase !== "resting") return;
+    let cancelled = false;
+    (async () => {
+      const { emit } = await import("@tauri-apps/api/event");
+      if (cancelled) return;
+      await emit("eye-rest-tick", { restLeft }).catch(() => undefined);
+    })();
     return () => {
       cancelled = true;
     };
   }, [phase, restLeft]);
 
   useEffect(() => {
+    if (phase !== "resting") return;
+    const unlisten = import("@tauri-apps/api/event").then(({ listen }) =>
+      listen("eye-rest-request-sync", () => {
+        import("@tauri-apps/api/event").then(({ emit }) =>
+          emit("eye-rest-tick", { restLeft: restLeftRef.current }),
+        );
+      }),
+    );
     return () => {
-      if (ownsOverlay.current) {
-        ownsOverlay.current = false;
-        closeEyeRestOverlay().catch(() => undefined);
-      }
+      unlisten.then((fn) => fn());
     };
-  }, []);
+  }, [phase]);
 }
 
 /**
- * 护眼状态机（播放器 / 猫窗各持一份，互斥由宿主决定 active）。
- * - active：本宿主是否走表；切宿主时对方从 0 重计即可
- * - phase 为 prompt/resting 时，即使 active 短暂变 false（播放器到点后 pause）也不清掉
+ * 全局护眼状态机（播放器 / 猫窗共用同一条时间线）。
+ * 用 localStorage 存绝对截止时刻，播↔不播切换不重置。
  */
-export function useEyeRestReminder(active: boolean, enabled: boolean) {
-  const [phase, setPhase] = useState<EyeRestPhase>("idle");
+export function useEyeRestReminder(enabled: boolean) {
+  const [phase, setPhase] = useState<EyeRestPhase>(() => readPersisted().phase);
   const [restLeft, setRestLeft] = useState(EYE_REST_BREAK_SEC);
   const [workLeftSec, setWorkLeftSec] = useState<number | null>(null);
-  const workTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const tickTimer = useRef<ReturnType<typeof setInterval> | undefined>(undefined);
-  const restTimer = useRef<ReturnType<typeof setInterval> | undefined>(undefined);
-  const snoozeUntil = useRef(0);
-  const workDeadline = useRef(0);
 
-  const clearWorkTimer = useCallback(() => {
-    if (workTimer.current !== undefined) {
-      window.clearTimeout(workTimer.current);
-      workTimer.current = undefined;
-    }
+  const clearTick = useCallback(() => {
     if (tickTimer.current !== undefined) {
       window.clearInterval(tickTimer.current);
       tickTimer.current = undefined;
     }
   }, []);
 
-  const clearWorkProgress = useCallback(() => {
-    clearWorkTimer();
-    workDeadline.current = 0;
-    setWorkLeftSec(null);
-  }, [clearWorkTimer]);
-
-  const startWorkCountdown = useCallback(
-    (durationMs: number) => {
-      clearWorkTimer();
-      workDeadline.current = Date.now() + durationMs;
-      const tick = () => {
-        const left = Math.max(0, Math.ceil((workDeadline.current - Date.now()) / 1000));
-        setWorkLeftSec(left);
-      };
-      tick();
-      tickTimer.current = window.setInterval(tick, 1000);
-      workTimer.current = window.setTimeout(() => {
-        clearWorkTimer();
-        setWorkLeftSec(null);
-        setPhase("prompt");
-      }, durationMs);
-    },
-    [clearWorkTimer],
-  );
-
-  const scheduleWorkTimer = useCallback(() => {
-    clearWorkProgress();
-    if (!enabled || !active || phase !== "idle") return;
-    if (Date.now() < snoozeUntil.current) {
-      workTimer.current = window.setTimeout(
-        scheduleWorkTimer,
-        snoozeUntil.current - Date.now(),
-      );
+  const applyState = useCallback((state: PersistedEyeRest) => {
+    setPhase(state.phase);
+    const now = Date.now();
+    if (state.phase === "resting" && state.restEndsAt) {
+      setRestLeft(Math.max(0, Math.ceil((state.restEndsAt - now) / 1000)));
+      setWorkLeftSec(null);
       return;
     }
-    startWorkCountdown(EYE_REST_WORK_MIN * 60 * 1000);
-  }, [active, clearWorkProgress, enabled, phase, startWorkCountdown]);
-
-  useEffect(() => {
-    scheduleWorkTimer();
-    return clearWorkProgress;
-  }, [active, enabled, phase, scheduleWorkTimer, clearWorkProgress]);
-
-  // 走表宿主失活：只停工时，不清 prompt/resting（播放器到点 pause 依赖此点）
-  useEffect(() => {
-    if (!active) clearWorkProgress();
-  }, [active, clearWorkProgress]);
-
-  useEffect(() => {
-    if (phase !== "resting") return;
+    if (state.phase === "prompt") {
+      setWorkLeftSec(null);
+      setRestLeft(EYE_REST_BREAK_SEC);
+      return;
+    }
+    if (state.workDeadline && state.workDeadline > now) {
+      setWorkLeftSec(Math.max(0, Math.ceil((state.workDeadline - now) / 1000)));
+    } else {
+      setWorkLeftSec(null);
+    }
     setRestLeft(EYE_REST_BREAK_SEC);
-    restTimer.current = window.setInterval(() => {
-      setRestLeft((prev) => {
-        if (prev <= 1) {
-          if (restTimer.current) window.clearInterval(restTimer.current);
-          setPhase("idle");
-          return EYE_REST_BREAK_SEC;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-    return () => {
-      if (restTimer.current) window.clearInterval(restTimer.current);
-    };
-  }, [phase]);
+  }, []);
 
-  const startRest = useCallback(() => setPhase("resting"), []);
+  const ensureRunningState = useCallback((): PersistedEyeRest => {
+    const now = Date.now();
+    let state = readPersisted();
+
+    if (!enabled) {
+      const cleared = { ...DEFAULT_STATE };
+      if (
+        state.phase !== cleared.phase ||
+        state.workDeadline !== cleared.workDeadline ||
+        state.snoozeUntil !== cleared.snoozeUntil ||
+        state.restEndsAt !== cleared.restEndsAt
+      ) {
+        writePersisted(cleared);
+      }
+      return cleared;
+    }
+
+    // resting 到点 → 下一轮 idle
+    if (state.phase === "resting") {
+      if (state.restEndsAt && state.restEndsAt <= now) {
+        state = {
+          phase: "idle",
+          workDeadline: now + EYE_REST_WORK_MIN * 60 * 1000,
+          snoozeUntil: 0,
+          restEndsAt: null,
+        };
+        writePersisted(state);
+      }
+      return state;
+    }
+
+    if (state.phase === "prompt") {
+      return state;
+    }
+
+    // idle：snooze 中先不走表
+    if (state.snoozeUntil > now) {
+      if (state.workDeadline !== null) {
+        state = { ...state, workDeadline: null };
+        writePersisted(state);
+      }
+      return state;
+    }
+
+    // idle：工时已到 → prompt
+    if (state.workDeadline !== null && state.workDeadline <= now) {
+      state = {
+        phase: "prompt",
+        workDeadline: null,
+        snoozeUntil: 0,
+        restEndsAt: null,
+      };
+      writePersisted(state);
+      return state;
+    }
+
+    // idle：还没开跑（或 snooze 刚结束）→ 启动/续跑全局工时
+    if (state.workDeadline === null) {
+      state = {
+        phase: "idle",
+        workDeadline: now + EYE_REST_WORK_MIN * 60 * 1000,
+        snoozeUntil: 0,
+        restEndsAt: null,
+      };
+      writePersisted(state);
+    }
+
+    return state;
+  }, [enabled]);
+
+  // 主循环：全局 tick，跨窗靠 storage 同步
+  useEffect(() => {
+    const syncFromStore = () => {
+      applyState(ensureRunningState());
+    };
+
+    syncFromStore();
+    clearTick();
+    tickTimer.current = window.setInterval(syncFromStore, 1000);
+
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === STATE_KEY || e.key === ENABLED_KEY) syncFromStore();
+    };
+    window.addEventListener("storage", onStorage);
+    window.addEventListener(STATE_EVENT, syncFromStore);
+    window.addEventListener(ENABLED_EVENT, syncFromStore);
+
+    return () => {
+      clearTick();
+      window.removeEventListener("storage", onStorage);
+      window.removeEventListener(STATE_EVENT, syncFromStore);
+      window.removeEventListener(ENABLED_EVENT, syncFromStore);
+    };
+  }, [applyState, clearTick, ensureRunningState]);
+
+  const startRest = useCallback(() => {
+    const next: PersistedEyeRest = {
+      phase: "resting",
+      workDeadline: null,
+      snoozeUntil: 0,
+      restEndsAt: Date.now() + EYE_REST_BREAK_SEC * 1000,
+    };
+    writePersisted(next);
+    applyState(next);
+  }, [applyState]);
 
   const snooze = useCallback(() => {
-    snoozeUntil.current = Date.now() + EYE_REST_SNOOZE_MIN * 60 * 1000;
-    setPhase("idle");
-  }, []);
+    const next: PersistedEyeRest = {
+      phase: "idle",
+      workDeadline: null,
+      snoozeUntil: Date.now() + EYE_REST_SNOOZE_MIN * 60 * 1000,
+      restEndsAt: null,
+    };
+    writePersisted(next);
+    applyState(next);
+  }, [applyState]);
 
   const dismissPrompt = useCallback(() => {
-    snoozeUntil.current = Date.now() + EYE_REST_SNOOZE_MIN * 60 * 1000;
-    setPhase("idle");
-  }, []);
-
-  /** 切到对方宿主时调用：本侧从干净 idle 开始，下次 active 再 20 分钟 */
-  const reset = useCallback(() => {
-    snoozeUntil.current = 0;
-    clearWorkProgress();
-    setPhase("idle");
-    setRestLeft(EYE_REST_BREAK_SEC);
-  }, [clearWorkProgress]);
+    snooze();
+  }, [snooze]);
 
   return {
     phase,
     restLeft,
-    /** 工时剩余秒；idle 且正在走表时有值，供预告状态条 */
     workLeftSec,
     startRest,
     snooze,
     dismissPrompt,
-    reset,
   };
 }
