@@ -580,12 +580,7 @@ pub fn prepare_dialog(app: AppHandle) {
 
 #[tauri::command]
 pub fn show_panel_window(app: AppHandle) -> Result<(), String> {
-    activate_for_action(&app);
-    if let Some(window) = app.get_webview_window("panel") {
-        let _ = window.unminimize();
-        let _ = window.show();
-        let _ = window.set_focus();
-    }
+    crate::show_panel(&app);
     Ok(())
 }
 

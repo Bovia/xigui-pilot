@@ -28,6 +28,19 @@ pub const CAT_COMPANION_LESSON: u32 = 0;
 /// 护眼整屏黑底倒计时（每块显示器一个：eye-rest-0 / eye-rest-1 …）
 pub const EYE_REST_WINDOW_PREFIX: &str = "eye-rest-";
 
+/// 菜单栏托盘图标（编译进二进制，release .app 不依赖 default_window_icon）
+fn tray_icon_image() -> tauri::image::Image<'static> {
+    tauri::include_image!("icons/32x32.png")
+}
+
+fn apply_tray_icon(app: &AppHandle) {
+    let tray_id = app.state::<AppState>().tray_id.clone();
+    let Some(tray) = app.tray_by_id(&tray_id) else {
+        return;
+    };
+    let _ = tray.set_icon(Some(tray_icon_image()));
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -36,11 +49,12 @@ pub fn run() {
         .plugin(tauri_plugin_positioner::init())
         .plugin(tauri_plugin_autostart::Builder::new().build())
         .setup(|app| {
+            // 菜单栏 NSStatusItem 在部分 macOS 版本上注册不稳定；改走 Dock 常驻，保证入口始终可见。
             #[cfg(target_os = "macos")]
-            app.set_activation_policy(ActivationPolicy::Accessory);
+            app.set_activation_policy(ActivationPolicy::Regular);
 
             let tray = TrayIconBuilder::new()
-                .icon(app.default_window_icon().unwrap().clone())
+                .icon(tray_icon_image())
                 .tooltip("系规助手")
                 .show_menu_on_left_click(false)
                 .on_tray_icon_event(|tray, event| {
@@ -63,6 +77,7 @@ pub fn run() {
             });
 
             refresh_tray_badge(app.handle());
+            apply_tray_icon(app.handle());
 
             if let Ok((_, settings)) = commands::settings_for(app.handle()) {
                 let _ = apply_panel_pinned(app.handle(), settings.panel_pinned());
@@ -114,7 +129,11 @@ pub fn run() {
         .expect("error while running tauri application")
         .run(|app, event| {
             match event {
-                RunEvent::Ready => show_panel(&app),
+                RunEvent::Ready => {
+                    apply_tray_icon(&app);
+                    refresh_tray_badge(&app);
+                    show_panel(&app);
+                }
                 RunEvent::Reopen { .. } => toggle_panel(&app),
                 RunEvent::WindowEvent { label, event, .. } if label == "panel" => {
                     if let tauri::WindowEvent::Focused(false) = event {
@@ -125,6 +144,7 @@ pub fn run() {
                             .map(|v| *v)
                             .unwrap_or(false);
                         if suppress || panel_should_stay_visible(&app) {
+                            restore_menu_bar_presence(&app);
                             return;
                         }
                         if let Some(window) = app.get_webview_window("panel") {
@@ -195,11 +215,12 @@ pub fn activate_for_action(app: &AppHandle) {
     }
 }
 
-pub fn restore_accessory(app: &AppHandle) {
-    #[cfg(target_os = "macos")]
-    {
-        let _ = app.set_activation_policy(ActivationPolicy::Accessory);
-    }
+/// Dock 图标常驻，不再切回 Accessory（保留函数签名兼容既有调用点）。
+pub fn restore_accessory(_app: &AppHandle) {}
+
+fn restore_menu_bar_presence(app: &AppHandle) {
+    apply_tray_icon(app);
+    refresh_tray_badge(app);
 }
 
 pub fn apply_panel_pinned(app: &AppHandle, pinned: bool) -> Result<(), String> {
@@ -259,6 +280,16 @@ pub fn refresh_tray_badge(app: &AppHandle) {
         count: 0,
         today_scope: true,
     });
+
+    // Dock 图标角标：主入口已切到 Dock，未看课节数在这里提醒最直接。
+    if let Some(window) = app.get_webview_window("panel") {
+        let _ = window.set_badge_count(if badge.count > 0 {
+            Some(badge.count as i64)
+        } else {
+            None
+        });
+    }
+
     let tray_id = app.state::<AppState>().tray_id.clone();
     let Some(tray) = app.tray_by_id(&tray_id) else {
         return;
@@ -280,10 +311,9 @@ pub fn refresh_tray_badge(app: &AppHandle) {
     let _ = tray.set_tooltip(Some(tooltip));
 }
 
-fn show_panel(app: &AppHandle) {
+pub(crate) fn show_panel(app: &AppHandle) {
     // 托盘点击后 macOS 常立刻再丢一次焦点；短抑制，避免「闪一下就没」
     set_panel_hide_suppressed(app, true);
-    // 先建猫窗（保持 Accessory），再切 Regular 聚焦面板，否则多桌面/全屏行为可能绑死在创建桌面
     ensure_cat_companion(app);
     activate_for_action(app);
     if let Some(window) = app.get_webview_window("panel") {
@@ -291,6 +321,7 @@ fn show_panel(app: &AppHandle) {
         let _ = window.show();
         let _ = window.set_focus();
     }
+    restore_menu_bar_presence(app);
     let handle = app.clone();
     std::thread::spawn(move || {
         std::thread::sleep(std::time::Duration::from_millis(450));
