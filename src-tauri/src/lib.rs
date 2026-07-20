@@ -13,6 +13,7 @@ use tauri::{
     ActivationPolicy, AppHandle, Emitter, LogicalSize, Manager, RunEvent, TitleBarStyle,
     WebviewUrl, WebviewWindow, WebviewWindowBuilder,
 };
+use tauri_plugin_notification::NotificationExt;
 use tauri_plugin_positioner::{on_tray_event, WindowExt};
 
 pub struct AppState {
@@ -41,10 +42,44 @@ fn apply_tray_icon(app: &AppHandle) {
     let _ = tray.set_icon(Some(tray_icon_image()));
 }
 
+/// 学习提醒：菜单栏图标不稳定，用系统通知（右上角弹出）顶替，隔一段时间提一下还剩几节没看。
+const STUDY_REMINDER_INTERVAL_SECS: u64 = 2 * 60 * 60;
+
+fn send_study_reminder(app: &AppHandle) {
+    let badge = commands::tray_badge_count(app).unwrap_or(commands::TrayBadge {
+        count: 0,
+        today_scope: true,
+    });
+    if badge.count == 0 {
+        return;
+    }
+    let body = if badge.today_scope {
+        format!("今日还有 {} 节未看，抽空学一下吧～", badge.count)
+    } else {
+        format!("本周还有 {} 节未看，别落太多啦～", badge.count)
+    };
+    let _ = app
+        .notification()
+        .builder()
+        .title("系规助手")
+        .body(body)
+        .show();
+}
+
+/// 启动即提醒一次，之后按固定间隔循环检查（数字为 0 时静默跳过，不打扰）。
+fn start_study_reminder_loop(app: &AppHandle) {
+    let handle = app.clone();
+    std::thread::spawn(move || loop {
+        send_study_reminder(&handle);
+        std::thread::sleep(std::time::Duration::from_secs(STUDY_REMINDER_INTERVAL_SECS));
+    });
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_positioner::init())
         .plugin(tauri_plugin_autostart::Builder::new().build())
@@ -133,6 +168,7 @@ pub fn run() {
                     apply_tray_icon(&app);
                     refresh_tray_badge(&app);
                     show_panel(&app);
+                    start_study_reminder_loop(&app);
                 }
                 RunEvent::Reopen { .. } => toggle_panel(&app),
                 RunEvent::WindowEvent { label, event, .. } if label == "panel" => {
